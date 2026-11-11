@@ -3,9 +3,9 @@
 # Same pattern as the tournament site and uid-relay: no image build, the
 # container clones the repo at start and runs it.
 #
-# This service has NO secrets, NO database and NO volume. It serves static files
-# and proxies read-only public APIs, so there is nothing to persist and nothing
-# to leak. If it is destroyed and recreated, it comes back identical. That is
+# This service has NO database and NO volume. It serves static files, proxies
+# read-only public APIs and relays the Chat tab's login, so there is nothing to
+# persist. Its one optional secret comes from Dockhand's environment. If it is destroyed and recreated, it comes back identical. That is
 # also what makes auto-update safe here: a redeploy cannot lose data, because
 # there is no data.
 #
@@ -51,5 +51,10 @@ services:
       # Leave them empty and those three tabs say the login is missing.
       FAF_API_CLIENT_ID: "${FAF_API_CLIENT_ID:-}"
       FAF_API_CLIENT_SECRET: "${FAF_API_CLIENT_SECRET:-}"
+
+      # The Chat tab's player login (FAF's public "FAF Web" client, no secret).
+      # Empty uses the default. "off" hides the login, e.g. until FAF has
+      # created the client.
+      FAF_LOGIN_CLIENT_ID: "${FAF_LOGIN_CLIENT_ID:-}"
 
     command: ["sh", "-c", "set -e; rm -rf /app; mkdir -p /app; git clone --depth 1 --branch main https://github.com/Nuggets75/faf-web.git /app; cd /app; exec node server.js"]

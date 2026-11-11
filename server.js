@@ -12,10 +12,14 @@
  * browser origins, because no browser ever calls it directly. It also means
  * the tournament site does not need CORS headers added.
  *
- * No database and no user logins. The one optional secret is the service login
- * for FAF's API (FAF_API_CLIENT_ID / FAF_API_CLIENT_SECRET, lib/faftoken.js),
- * which Maps, Mods and Replays need because FAF's API serves no anonymous
- * listings. Without it those tabs say so; everything else still works.
+ * No database. The one optional secret is the service login for FAF's API
+ * (FAF_API_CLIENT_ID / FAF_API_CLIENT_SECRET, lib/faftoken.js), which Maps,
+ * Mods and Replays need because FAF's API serves no anonymous listings.
+ * Without it those tabs say so; everything else still works.
+ *
+ * Visitors can log in for the Chat tab (lib/userlogin.js). The server only
+ * relays the login calls the browser cannot make itself and keeps nothing:
+ * the chat connection goes from the browser straight to FAF's chat server.
  *
  * Zero runtime dependencies, no build step. Upload the files, restart the
  * container.
@@ -29,6 +33,7 @@ const { createCache, proxyGet } = require('./lib/proxy');
 const { resolveFile, cacheHeader } = require('./lib/static');
 const { createWatcher } = require('./lib/watcher');
 const { createTokenSource } = require('./lib/faftoken');
+const { createUserLogin, CHAT_URL } = require('./lib/userlogin');
 const { boardTarget, pageOf, apiTarget, pageFromApi } = require('./lib/leaderboard');
 
 const PORT = Number(process.env.PORT || 8098);
@@ -47,6 +52,11 @@ const serviceLogin = createTokenSource({
   clientSecret: process.env.FAF_API_CLIENT_SECRET,
   tokenUrl: process.env.FAF_OAUTH_TOKEN_URL || undefined
 });
+// The Chat tab's login. On by default with FAF's "FAF Web" client;
+// FAF_LOGIN_CLIENT_ID=off switches it off, any other value replaces the id.
+const loginClientId = process.env.FAF_LOGIN_CLIENT_ID;
+const userLogin = loginClientId === 'off' ? null : createUserLogin(loginClientId ? { clientId: loginClientId } : {});
+const MAX_BODY_BYTES = 8 * 1024;
 let watcher = null;
 
 /* ------------------------------------------------------------------ logging */
@@ -81,7 +91,8 @@ function securityHeaders() {
       "default-src 'self'",
       "img-src 'self' https://content.faforever.com data:",
       "frame-src https://www.faforever.com https://faforever.github.io https://unitdb.faforever.com https://www.youtube-nocookie.com",
-      "connect-src 'self'",
+      // The Chat tab talks to FAF's chat server directly over a WebSocket.
+      "connect-src 'self' " + CHAT_URL,
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self'",
       "base-uri 'none'",
@@ -93,6 +104,14 @@ function securityHeaders() {
 /* ------------------------------------------------------------------- routing */
 
 async function handleApi(req, res, url) {
+  if (url.pathname.startsWith('/api/auth/')) {
+    await handleAuth(req, res, url.pathname.slice('/api/auth/'.length));
+    return;
+  }
+  if (url.pathname === '/api/config' && req.method === 'GET') {
+    sendJson(res, 200, userLogin ? userLogin.config() : { login: null, chat: null });
+    return;
+  }
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     sendJson(res, 405, { error: 'this API is read-only' });
@@ -222,6 +241,82 @@ async function handleLeaderboard(res, board, url) {
   sendJson(res, 200, page, { 'X-Cache': out.cached ? 'HIT' : 'MISS' });
 }
 
+/** A small JSON request body, or null after answering why there is none. */
+function readJsonBody(req, res) {
+  return new Promise((resolve) => {
+    if (!/^application\/json\b/i.test(req.headers['content-type'] || '')) {
+      sendJson(res, 415, { error: 'send JSON' });
+      resolve(null);
+      return;
+    }
+    const chunks = [];
+    let size = 0;
+    let done = false;
+    req.on('data', (c) => {
+      if (done) return;
+      size += c.length;
+      if (size > MAX_BODY_BYTES) {
+        done = true;
+        sendJson(res, 413, { error: 'request too large' });
+        resolve(null);
+        req.resume();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on('end', () => {
+      if (done) return;
+      done = true;
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+      } catch (_) {
+        sendJson(res, 400, { error: 'bad JSON' });
+        resolve(null);
+      }
+    });
+    req.on('error', () => { if (!done) { done = true; resolve(null); } });
+  });
+}
+
+/**
+ * POST /api/auth/login | refresh | logout - see lib/userlogin.js. Answers carry
+ * tokens, so nothing here is cached or logged beyond the outcome.
+ */
+async function handleAuth(req, res, action) {
+  if (!['login', 'refresh', 'logout'].includes(action)) {
+    sendJson(res, 404, { error: 'unknown endpoint' });
+    return;
+  }
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    sendJson(res, 405, { error: 'use POST' });
+    return;
+  }
+  if (!userLogin) {
+    sendJson(res, 503, { error: 'login is switched off on this server', code: 'login-off' });
+    return;
+  }
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const t0 = Date.now();
+  try {
+    if (action === 'logout') {
+      await userLogin.logout(body);
+      sendJson(res, 200, { ok: true });
+      log('info', 'auth', { action, ms: Date.now() - t0 });
+      return;
+    }
+    const session = await userLogin[action](body);
+    sendJson(res, 200, session);
+    log('info', 'auth', { action, ok: true, ms: Date.now() - t0 });
+  } catch (err) {
+    const status = err.status || 500;
+    const code = err.code || 'internal';
+    log(status >= 500 ? 'error' : 'warn', 'auth', { action, ok: false, status, code, ms: Date.now() - t0 });
+    sendJson(res, status, { error: status >= 500 && !err.code ? 'internal error' : err.message, code });
+  }
+}
+
 function handleStatic(req, res, url) {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.setHeader('Allow', 'GET, HEAD');
@@ -272,6 +367,7 @@ const server = http.createServer((req, res) => {
       cacheEntries: cache.size(),
       playTab: true,
       serviceLogin: Boolean(serviceLogin),
+      chatLogin: Boolean(userLogin),
       autoUpdate: watcher ? watcher.status() : { enabled: false }
     });
     return;

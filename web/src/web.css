@@ -389,6 +389,22 @@ body {
   background: var(--color-surface);
 }
 
+/* In the desktop client these tabs fill the window and scroll inside their own
+   panels (ds/shell.css). Here they are ordinary pages, so the page scrolls:
+   without this, a long leaderboard was cut off at the window's edge. */
+.content.content-tab-play,
+.content.content-tab-leaderboard,
+.content.content-tab-tournaments {
+  overflow-y: auto;
+}
+
+.content-inner.content-play,
+.content-inner.content-leaderboard,
+.content-inner.content-tournaments {
+  height: auto;
+  overflow: visible;
+}
+
 /* ---- Shell: the phone layout ----------------------------------------------- */
 
 .web-topbar,

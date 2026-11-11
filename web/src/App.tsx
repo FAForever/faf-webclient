@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Icon, type IconName } from "./ds/Icon";
+import { ChatView } from "./views/ChatView";
 import { ErrorBoundary } from "./views/ErrorBoundary";
 import { EmbedView, EventsView, LinksView, TournamentsView } from "./views/ListViews";
 import { LeaderboardView } from "./views/LeaderboardView";
@@ -16,7 +17,7 @@ interface TabDef {
 }
 
 // Same order, labels and icons as the Rust client's sidebar (ui/src/features/nav/tabs.tsx),
-// minus the tabs that need a login (Chat, Training, Settings).
+// minus Training and Settings. Chat is the one tab that needs a login.
 const TABS: TabDef[] = [
   {
     id: "news",
@@ -24,6 +25,7 @@ const TABS: TabDef[] = [
     icon: "news",
     Component: () => <EmbedView title="News" description="The FAF news hub." url="https://www.faforever.com/newshub" />,
   },
+  { id: "chat", label: "Chat", icon: "chat", Component: ChatView },
   { id: "play", label: "Play", icon: "play", Component: PlayView },
   { id: "replays", label: "Replays", icon: "replays", Component: ReplaysView },
   { id: "maps", label: "Maps", icon: "maps", Component: () => <VaultView kind="map" /> },
@@ -49,6 +51,8 @@ const TABS: TabDef[] = [
 const DEFAULT_TAB = "play";
 
 function tabFromPath(): string {
+  // FAF's login page sends the visitor back here; the Chat tab finishes the login.
+  if (window.location.pathname === "/auth/callback") return "chat";
   const id = window.location.pathname.replace(/^\/+|\/+$/g, "");
   return TABS.some((tab) => tab.id === id) ? id : DEFAULT_TAB;
 }

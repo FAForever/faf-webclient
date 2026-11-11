@@ -1,0 +1,1046 @@
+/* Chat tab styles. Everything up to the "Web additions" line is copied from
+   the FAF Rust client (ui/src/design-system/section-tabs.css and
+   ui/src/features/chat/chat.css, commit ed3121e9, MIT), keeping only the
+   parts this page uses. */
+
+.section-tabs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--color-border);
+  scrollbar-width: none;
+}
+
+.section-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.section-tabs button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: -1px;
+  padding: 0 14px;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.section-tabs button:hover,
+.section-tabs button.active {
+  color: var(--color-text);
+}
+
+.section-tabs button.active {
+  border-bottom-color: var(--color-text);
+}
+
+.section-tabs button:focus-visible {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -3px;
+}
+
+/* A flex row, so an icon beside the words is centred on them. In the line of
+   text it was, an icon sat on the text's baseline and the words looked low
+   beside it. */
+.section-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* A rounded rectangle rather than a capsule, with the digits centred on
+   their own ink rather than on the font's line box (issue 351).
+
+   A one-em line box was not enough. Segoe UI, which is what the default
+   theme falls back to where Inter is not installed, reserves more room
+   below the baseline than above the digits, so a centred line box leaves
+   the digits about 0.6px low in 18px. `text-box` trims the box to cap
+   height and baseline, and the flex centring then centres the digits
+   themselves, whatever the font. The one-em line height stays as the
+   fallback for an engine without `text-box`. */
+.section-tab-count {
+  text-box: trim-both cap alphabetic;
+  display: inline-flex;
+  min-width: 20px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  color: var(--color-muted);
+  background: var(--color-surface-raised);
+  border-radius: calc(var(--radius-sm) - 2px);
+  line-height: 1;
+  /* The 11px floor (AGENTS.md, UI Design Language) applies to badge text too. */
+  font-size: 11px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Chat: channel tabs on top, conversation below, grouped roster on the right.
+   The shell assigns the workspace sizing class; panes scroll internally instead
+   of stacking a second scrollbar on `.content`. */
+.chat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, min(var(--chat-roster-width, 280px), 50%));
+  gap: var(--space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-main,
+.chat-channel-panel,
+.chat-roster-shell,
+.chat-roster {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+
+.chat-roster-shell {
+  position: relative;
+}
+
+.chat-channel-panel {
+  flex: 1;
+}
+
+.chat-roster-shell > .chat-roster {
+  height: 100%;
+}
+
+.chat-roster {
+  overflow: hidden;
+}
+
+/* Shared text input, so the composer, join field and roster filter match. */
+.chat-input {
+  font: inherit;
+  min-width: 0;
+  flex: 1;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: var(--space-2) var(--space-3);
+}
+
+.chat-input::placeholder {
+  color: var(--color-subtle);
+}
+
+.chat-input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.chat-input:disabled {
+  color: var(--color-subtle);
+  /* Dimmed as well, as disabled controls are across the design system: in
+     the Java and Python themes the subtle colour is close to body text. */
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Channel switcher. Same underline strip as the Play tab's mode tabs: the
+   styling comes from `section-tabs.css`, and only what a channel tab has on top
+   of a mode tab lives here. */
+.chat-tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-3);
+}
+
+/* Wrapper that anchors the close button over the tab. */
+.chat-tab {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  max-width: 230px;
+  align-items: stretch;
+}
+
+/* `.section-tabs button` is `flex: 0 0 auto`, which would push a long channel
+   name past the wrapper's max-width instead of ellipsising inside it.
+   Both rules name the tab button explicitly: a `> button` selector would also
+   match the close button, and out-specify the reset below it. */
+.chat-tabs .chat-tab-button {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.chat-tab.is-closable .chat-tab-button {
+  padding-right: 32px;
+}
+
+.chat-tab-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A mention is the one unread that deserves a status colour. */
+.section-tab-count.is-mention {
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+}
+
+.chat-tab-join {
+  display: flex;
+  flex: none;
+  width: 190px;
+  align-items: center;
+  align-self: center;
+  margin-left: 4px;
+}
+
+.chat-tab-join .chat-input {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.chat-tab-close:focus-visible,
+.chat-tab-add:focus-visible,
+.chat-roster-identity:focus-visible,
+.chat-game-badge:focus-visible,
+.chat-nick:focus-visible,
+.chat-jump:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* Close micro-button inside the tab */
+.chat-tabs .chat-tab-close {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  color: var(--color-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+
+.chat-tab:hover .chat-tab-close,
+.chat-tab:focus-within .chat-tab-close,
+.chat-tab-button.active ~ .chat-tab-close {
+  opacity: 0.85;
+}
+
+.chat-tabs .chat-tab-close:hover {
+  opacity: 1;
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+/* Sits immediately after the last tab, styled as an integrated ghost action button */
+.chat-tabs .chat-tab-add {
+  flex: 0 0 auto;
+  display: inline-flex;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 4px;
+  padding: 0;
+  color: var(--color-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  align-self: center;
+  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+.chat-tabs .chat-tab-add:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.chat-tabs .chat-tab-add.is-active {
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border-color: var(--color-border);
+}
+
+/* Conversation context and controls sit below the switcher. The channel name
+   is not repeated here: the strip above is showing it. */
+.chat-head {
+  flex-wrap: wrap;
+  flex: none;
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 2px;
+  margin-bottom: var(--space-2);
+  min-width: 0;
+}
+
+.chat-head .spacer {
+  flex: 1;
+}
+
+.chat-head-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 100%;
+  gap: var(--space-2);
+}
+
+.chat-topic {
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: min(680px, 48vw);
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The head count, at the size of the "Joins & parts" toggle on the same row:
+   a status line for the room rather than a heading over it. */
+.chat-online-count {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chat-online-count svg {
+  flex: none;
+  color: var(--color-subtle);
+}
+
+.chat-online-count span {
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+}
+
+/* Every button in the head row (Contacts, Search, and the tournament chat's
+   Search), at the head's height so the row keeps its rhythm. A button added
+   without it is a size larger than its neighbours. */
+.chat-head-button {
+  flex: none;
+  min-height: 30px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.chat-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 12px;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.chat-head-action {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 5px;
+  padding: 4px 7px;
+  color: var(--color-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chat-head-action:hover,
+.chat-head-action:focus-visible {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+  outline: none;
+}
+
+.chat-toggle:hover {
+  color: var(--color-text);
+}
+
+.chat-scroll-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chat-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* 12 px at the sides, not 20: at the default window the message column is
+     about 250 px after the avatar, name and time columns, and every pixel of
+     padding is a character of the line people read for hours. */
+  padding: 14px 12px;
+  /* The scrollbar's kept room counts as part of the right padding, so the
+     sides match whether it shows or not (`--scrollbar-size`). */
+  padding-right: max(0px, 12px - var(--scrollbar-size));
+  scrollbar-gutter: stable;
+}
+
+/* Focused from code when the search bar closes, so the keys that follow
+   scroll the log. It is the log, not a control, and draws no ring of its own,
+   as the page does after a sidebar click (`.content:focus`). */
+.chat-messages:focus {
+  outline: none;
+}
+
+/* Where the log moves on to another day (issue 708): a rule across the log with
+   the day in its middle, quieter than any message. */
+.chat-day-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--color-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chat-day-divider::before,
+.chat-day-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--color-border);
+}
+
+.chat-empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: auto;
+}
+
+.chat-jump {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: var(--shadow-popover);
+}
+
+.chat-jump:hover {
+  background: var(--color-surface-hover);
+}
+
+.chat-message {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(64px, var(--chat-sender-width, 116px)) minmax(0, 1fr) 44px;
+  /* Columns only. The rows a message can have beyond its body are the quoted
+     line above it and the reactions below it, and both belong to this message:
+     a row gap pushed them towards the neighbouring messages instead. Each owns
+     its own spacing. */
+  column-gap: 6px;
+  row-gap: 0;
+  align-items: start;
+  min-height: 24px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  font-size: var(--chat-font-size, 13px);
+  line-height: 1.45;
+  flex-shrink: 0;
+}
+
+.chat-message:hover {
+  background: var(--color-surface-hover);
+}
+
+/* A line continuing the one above it sits tighter against it, so a run from
+   one person reads as one block. The name and avatar columns are still there,
+   empty, which is what keeps every body in the run on the same left edge. */
+.chat-message.is-continued {
+  padding-top: 0;
+  min-height: 0;
+}
+
+.chat-message-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--color-subtle);
+  text-align: right;
+}
+
+.chat-message-avatar {
+  display: grid;
+  width: 32px;
+  height: 18px;
+  place-items: center;
+  overflow: hidden;
+}
+
+.chat-message-avatar img {
+  display: block;
+  width: 32px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.chat-message-body {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-message:not(.is-action) > .chat-nick {
+  text-align: right;
+}
+
+.chat-message:not(.is-action) > .chat-nick::after {
+  content: ":";
+}
+
+.chat-message.is-info .chat-message-body,
+.chat-message.is-action .chat-message-body {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.chat-message.is-action .chat-message-body .chat-nick {
+  display: inline;
+  vertical-align: baseline;
+  font-style: italic;
+  text-align: left;
+}
+
+.chat-message.is-notice {
+  color: var(--color-text);
+}
+
+.chat-message.is-error {
+  color: var(--color-error-text);
+}
+
+.chat-message-actor {
+  font-weight: 600;
+}
+
+.chat-action-star {
+  display: block;
+  text-align: right;
+  font-weight: 700;
+  color: var(--color-subtle);
+  user-select: none;
+}
+
+/*
+ * Generated nickname colour. The hue arrives per nickname as `--nick-hue`
+ * (see chatFormat.tsx); saturation and lightness are theme tokens so the
+ * result stays legible on every surface.
+ */
+.chat-nick {
+  font: inherit;
+  font-weight: 600;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: hsl(
+    var(--nick-hue, 0) var(--chat-nick-saturation) var(--chat-nick-lightness)
+  );
+}
+
+/* Shrinks to fit, never grows: whatever follows the name (the note mark)
+   sits right after it rather than at the far end of the row. The button
+   around it still takes the row's width, so the whole row is clickable. */
+.chat-roster-user .chat-nick {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.chat-nick:hover {
+  text-decoration: underline;
+}
+
+.chat-nick.is-monochrome {
+  color: var(--color-text);
+}
+
+.chat-compose {
+  /* Nested inside `.chat-compose-shell`, which owns the reply banner above it
+     and the outer spacing. */
+  display: flex;
+  gap: var(--space-2);
+}
+
+.chat-compose-input {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+}
+
+/* Reserves its line whether or not anyone is composing, so the composer does
+   not jump up and down as people start and stop typing. */
+.chat-typing {
+  min-height: 14px;
+  margin: 2px 0 0;
+  padding: 0 var(--space-1);
+  color: var(--color-subtle);
+  font-size: 11px;
+  line-height: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-compose-shell {
+  display: flex;
+  margin-top: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* Under the typing line, which already stands between the conversation and
+   the composer. A full gap on top of the line it reserves put the composer
+   31 px below the messages; this is 18, 2 above a 14 px line and 2 below it,
+   with the typing text centred in it. */
+.chat-typing + .chat-compose-shell {
+  margin-top: 2px;
+}
+
+/* ── Roster ───────────────────────────────────────────────────────────── */
+.chat-roster-search {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  padding: var(--space-2) 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.chat-roster-search .chat-roster-search-field {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The rating the list is ordered by, at the end of the row. */
+.chat-roster-rating {
+  flex: none;
+  min-width: 32px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.chat-roster-search-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0 8px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-subtle);
+  cursor: text;
+}
+
+.chat-roster-search-field:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow);
+}
+
+.chat-roster-search-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.chat-roster-search-field input::placeholder {
+  color: var(--color-subtle);
+}
+
+.chat-roster-list {
+  /* The roster is virtualised: `UserList` places rows by arithmetic on this
+     exact height, so every row has to actually be this tall, headers included.
+     It is declared once, here, and read back by the component rather than
+     repeated as a JavaScript constant: the two drifted apart the first time
+     (26 px assumed against 24 px rows, 28 px for anyone in a game), which
+     desynchronised the scrollbar from the names under it. */
+  --roster-row-height: 26px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: var(--space-1);
+  /* The scrollbar's kept room counts as part of the right padding, so the
+     sides match whether it shows or not (`--scrollbar-size`). */
+  padding-right: max(0px, var(--space-1) - var(--scrollbar-size));
+  contain: strict;
+}
+
+.chat-roster-virtual-track {
+  position: relative;
+  width: 100%;
+}
+
+.chat-roster-virtual-window {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  will-change: transform;
+}
+
+.chat-roster-group-header,
+.chat-roster-item {
+  height: var(--roster-row-height);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chat-roster-group-header h3 {
+  margin: 0;
+  font: inherit;
+}
+
+/* A section header that is also the control that collapses it, following the
+   Java client's `chat_user_category` row: arrow, label, count. Sentence case
+   rather than the previous uppercase-with-letter-spacing, which shouted over
+   the names underneath (the whole point of the list) and made a long label
+   like "Moderators & admins" wrap awkwardly in a narrow roster. */
+.chat-roster-heading {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  padding: 4px 6px;
+  color: var(--color-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-roster-heading:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.chat-roster-heading:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.chat-roster-heading-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-roster-chevron {
+  flex: none;
+  color: var(--color-subtle);
+  transition: transform 120ms ease;
+}
+
+.chat-roster-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+/* Collapsed sections keep their count: it is the only thing still telling you
+   how many people are in there. */
+.chat-roster-count {
+  margin-left: auto;
+  padding-left: var(--space-2);
+  color: var(--color-subtle);
+  font-variant-numeric: tabular-nums;
+  font-weight: 550;
+}
+
+.chat-roster-user {
+  font: inherit;
+  font-size: 13px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: transparent;
+  border-radius: var(--radius-sm);
+}
+
+.chat-roster-user:hover,
+/* Held while this row's player menu is up. The menu opens under the pointer,
+   which has left the row by then, and the menu no longer prints the name
+   across its top: this is what says which of two hundred names it is about. */
+.chat-roster-user.is-menu-open {
+  background: var(--color-surface-hover);
+}
+
+.chat-roster-identity {
+  font: inherit;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+@media (max-width: 700px) {
+/*
+   * At narrow widths the roster is the first thing to go; the conversation is
+   * the pane you cannot work without. The channel tabs stay put (they scroll
+   * horizontally), so every open conversation is still reachable.
+   */
+  .chat {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-roster-shell {
+    display: none;
+  }
+
+  .chat-topic {
+    display: none;
+  }
+}
+
+/* From ui/src/features/chat/messages/chat-format.css. */
+.chat-mention {
+  background: none;
+  padding: 0;
+  color: var(--color-warn-text);
+  font-weight: 700;
+}
+
+.chat-link {
+  color: var(--color-accent);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Web additions --------------------------------------------------------- */
+
+/* The desktop client styles its scrollbars to this width; the rules above
+   reserve room for it. */
+.chat {
+  --scrollbar-size: 11px;
+}
+
+/* A private conversation has no roster: the conversation takes the width. */
+.chat.is-private {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* A line that names the reader. */
+.chat-message.is-ping {
+  background: color-mix(in srgb, var(--color-warn) 9%, transparent);
+}
+
+.chat-message.is-notice .chat-message-body {
+  color: var(--color-muted);
+}
+
+.chat-message.is-error .chat-message-body {
+  color: var(--color-error-text);
+}
+
+.chat-message.is-info .chat-message-body,
+.chat-message.is-error .chat-message-body {
+  grid-column: 2 / 4;
+}
+
+.chat-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.chat-status.is-problem {
+  color: var(--color-warn-text);
+}
+
+.chat-head-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chat-head-button:hover {
+  background: var(--color-surface-hover);
+}
+
+/* Only on a phone, where the roster has no column of its own. */
+.chat-roster-toggle {
+  display: none;
+}
+
+.chat-compose .btn-primary {
+  flex: none;
+}
+
+/* Logged out: the card that explains the login. */
+.chat-login {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 520px;
+  margin: var(--space-4) auto 0;
+  padding: var(--space-4);
+}
+
+.chat-login h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.chat-login p {
+  margin: 0;
+}
+
+.chat-login .chat-login-note {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.chat-login .chat-login-error {
+  color: var(--color-error-text);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 700px) {
+  .content-inner.content-chat {
+    padding: 8px 10px 10px;
+  }
+
+  .chat-roster-toggle {
+    display: inline-flex;
+  }
+
+  /* The roster takes the conversation's place while it is open, below the
+     channel tabs. */
+  .chat.is-roster-open {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .chat.is-roster-open .chat-roster-shell {
+    display: flex;
+    gap: var(--space-2);
+  }
+
+  .chat-roster-back {
+    align-self: flex-start;
+    min-height: 30px;
+    padding: 0 10px;
+  }
+
+  .chat.is-roster-open .chat-channel-panel {
+    display: none;
+  }
+
+  .chat-messages {
+    padding: 8px 4px;
+  }
+
+  .chat-message {
+    grid-template-columns: minmax(48px, 92px) minmax(0, 1fr) 38px;
+    padding: 2px 4px;
+  }
+
+  .chat-message-avatar {
+    display: none;
+  }
+
+  /* 16 px stops phones from zooming the page in while typing. */
+  .chat-compose-input {
+    font-size: 16px;
+  }
+
+  .chat-head-controls {
+    flex-wrap: nowrap;
+  }
+}

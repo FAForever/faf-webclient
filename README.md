@@ -1,17 +1,19 @@
 # faf-web
 
-A view-only FAF website in the design of the FAF Rust client, usable on phones.
+A FAF website in the design of the FAF Rust client, usable on phones. Everything is view-only and needs no account, except the Chat tab, which needs a FAF login.
 
-Tabs: News, Play (open lobbies), Replays, Maps, Mods, Leaderboard, Tournaments, Events, Changelog, Units, Links.
+Tabs: News, Chat, Play (open lobbies), Replays, Maps, Mods, Leaderboard, Tournaments, Events, Changelog, Units, Links.
 
 ## How it works
 
 ```
 browser  ──►  faf-web (server.js)  ──►  api.faforever.com            maps, mods, replays, leaderboards (service login)
                                     ──►  www.faforever.com           leaderboards without the login (public JSON)
-                                    ──►  lobby.faforever.com/games    open lobbies
+                                    ──►  lobby.faforever.com          open lobbies, live games, matchmaker queues
                                     ──►  tournaments.faforever.com    tournaments
                                     ──►  raw.githubusercontent.com   events calendar
+                                    ──►  hydra / user.faforever.com   Chat tab login (relayed, see below)
+browser  ──────────────────────────►  wss://chat.faforever.com     Chat tab, straight from the browser
 ```
 
 News, Changelog and Units are FAF's own pages, shown in a frame.
@@ -20,7 +22,7 @@ News, Changelog and Units are FAF's own pages, shown in a frame.
 - `server.js` serves the built site from `public/` and proxies a fixed allowlist of read-only upstreams (`lib/upstreams.js`).
 - Every visitor shares one cached copy of each response, so FAF's servers see one client, not one per visitor.
 - The proxy never forwards a visitor's cookies or credentials, and only allows GET.
-- Open lobbies come from the lobby server's public `GET /games` endpoint. Until that endpoint is live, the Play tab says so.
+- Open lobbies come from the lobby server's public `GET /games` endpoint (FAForever/server PR "Public endpoints for the game list and matchmaker queues", which also adds live games and `GET /matchmaker`). Until it is live, the Play tab says so.
 - Leaderboards come from FAF's API when the service login is set up, otherwise from faforever.com's public JSON (`/leaderboards/<board>.json`), which the server pages and searches. faforever.com is behind Cloudflare and may refuse a server's request; the log line then shows `"server":"cloudflare"`, and the tab says so.
 - Replays can be downloaded by ID with no login at all: `replay.faforever.com/<id>` redirects to the API's public replay download.
 - Replay downloads link straight to `replay.faforever.com/<id>`, which needs no login.
@@ -36,6 +38,18 @@ FAF's API only answers requests that carry a token; there are no anonymous listi
 3. Redeploy. `GET /healthz` shows `"serviceLogin": true`.
 
 Without these variables, those three tabs say the login isn't set up, and everything else works. The token never leaves the server: it is only attached to requests to api.faforever.com.
+
+## Chat login
+
+The Chat tab logs players in with their FAF account and connects them to FAF's chat (IRC over WebSocket), like the desktop clients do.
+
+1. The browser sends the player to FAF's login page (Hydra, authorization code with PKCE). The client is FAF's public "FAF Web" client: no secret, scope `openid offline public_profile`, redirect `https://<your domain>/auth/callback`.
+2. FAF sends the player back to `/auth/callback`. Hydra and FAF's user service answer no browser requests from other sites (no CORS), so `server.js` makes the next calls for the browser (`POST /api/auth/login`, `lib/userlogin.js`): code to tokens, then the player's chat token from `user.faforever.com`. The browser gets the player's name, the chat token and the refresh token. The access token stays on the server, and nothing is stored or logged there.
+3. The browser connects to `wss://chat.faforever.com` itself, from the player's own address. A new chat token (24 hours) comes through `POST /api/auth/refresh`.
+
+FAF's chat lets one account be connected several times, so the desktop client stays online. Both connections share their channels: closing a channel tab here only hides it, and `/part` leaves it everywhere.
+
+The client has to exist in FAF's Hydra (gitops-stack `apps/ory-hydra/values.yaml`, "FAF Web") with this site's callback among its redirect URIs. Until then, set `FAF_LOGIN_CLIENT_ID=off` in Dockhand and the Chat tab says login isn't available. `GET /healthz` shows `"chatLogin"`.
 
 ## Layout
 

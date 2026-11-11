@@ -23,6 +23,7 @@ const { resolveFile } = require('./lib/static');
 const { createWatcher, redactUrl } = require('./lib/watcher');
 const { createTokenSource } = require('./lib/faftoken');
 const { boardTarget, pageOf, apiTarget, pageFromApi, PAGE_SIZE } = require('./lib/leaderboard');
+const { createUserLogin, jwtClaims, validRedirect } = require('./lib/userlogin');
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -48,6 +49,9 @@ function testUpstreams() {
   const lobby = resolve('lobby', 'games', '');
   ok(lobby && lobby.url === 'https://lobby.faforever.com/games',
     'upstream: the public lobby list resolves to lobby.faforever.com/games', lobby && lobby.url);
+  const queues = resolve('lobby', 'matchmaker', '');
+  ok(queues && queues.url === 'https://lobby.faforever.com/matchmaker',
+    'upstream: the public matchmaker queues resolve to lobby.faforever.com/matchmaker', queues && queues.url);
   eq(resolve('lobby', 'players', ''), null, 'upstream: nothing else on the lobby host is reachable');
 
   eq(resolve('faf', 'secretThing', ''), null, 'upstream: a resource not on the allowlist is refused');
@@ -124,6 +128,88 @@ async function testServiceLogin() {
   try { await bad.get(); } catch (err) { msg = err.message; }
   ok(/401 invalid_client/.test(msg), 'login: a rejected client reports why', msg);
   ok(!msg.includes('wrong'), 'login: the error never contains the secret');
+}
+
+/* ------------------------------------------------------------ user login */
+
+function fakeJwt(claims) {
+  const part = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return part({ alg: 'RS256' }) + '.' + part(claims) + '.sig';
+}
+
+async function testUserLogin() {
+  const posts = [];
+  const gets = [];
+  let tokenReply = { status: 200, body: JSON.stringify({ access_token: fakeJwt({ sub: '4242', ext: { username: 'Nuggets' } }), refresh_token: 'r2', expires_in: 3600 }) };
+  const login = createUserLogin({
+    clientId: 'web-client',
+    postImpl: async (url, form) => { posts.push({ url, form }); return tokenReply; },
+    getImpl: async (url, token) => {
+      gets.push({ url, token });
+      if (url.endsWith('/irc/ergochat/token')) return { status: 200, body: JSON.stringify({ value: 'irc-token' }) };
+      return { status: 404, body: '' };
+    }
+  });
+
+  const cfg = login.config();
+  eq(cfg.login.clientId, 'web-client', 'user login: config names the public client');
+  eq(cfg.login.authorizeUrl, 'https://hydra.faforever.com/oauth2/auth', 'user login: logins go to FAF\'s Hydra');
+  ok(!/\blobby\b/.test(cfg.login.scope), 'user login: does not ask for the lobby scope (no ownership check needed to chat)');
+  ok(/\boffline\b/.test(cfg.login.scope), 'user login: asks for a refresh token');
+  eq(cfg.chat.url, 'wss://chat.faforever.com', 'user login: config names FAF\'s chat server');
+
+  const verifier = 'v'.repeat(43);
+  const s1 = await login.login({ code: 'abc', codeVerifier: verifier, redirectUri: 'https://web.example.org/auth/callback' });
+  eq(posts[0].url, 'https://hydra.faforever.com/oauth2/token', 'user login: the code is exchanged at Hydra');
+  eq(posts[0].form.grant_type, 'authorization_code', 'user login: authorization code grant');
+  eq(posts[0].form.code_verifier, verifier, 'user login: PKCE verifier is passed on');
+  eq(posts[0].form.client_id, 'web-client', 'user login: as the public client');
+  ok(!('client_secret' in posts[0].form), 'user login: no secret is involved');
+  eq(s1.user.name, 'Nuggets', 'user login: the name comes from the token');
+  eq(s1.user.id, '4242', 'user login: and the id');
+  eq(s1.chatToken, 'irc-token', 'user login: a chat token is fetched');
+  eq(s1.refreshToken, 'r2', 'user login: the refresh token goes back to the browser');
+  ok(!('accessToken' in s1) && !JSON.stringify(s1).includes(fakeJwt({ sub: '4242', ext: { username: 'Nuggets' } })),
+    'user login: the access token never reaches the browser');
+  eq(gets.length, 1, 'user login: no API call needed when the token names the user');
+
+  const s2 = await login.refresh({ refreshToken: 'r1' });
+  eq(posts[1].form.grant_type, 'refresh_token', 'user login: refresh uses the refresh grant');
+  eq(posts[1].form.refresh_token, 'r1', 'user login: with the browser\'s refresh token');
+  eq(s2.chatToken, 'irc-token', 'user login: refresh hands out a fresh chat token');
+
+  async function code(fn) { try { await fn(); return 'none'; } catch (err) { return err.status + ' ' + err.code; } }
+  eq(await code(() => login.login({ code: 'abc', codeVerifier: 'short', redirectUri: 'https://x.org/auth/callback' })),
+    '400 bad-request', 'user login: a malformed verifier is refused before Hydra');
+  eq(await code(() => login.login({ code: 'abc', codeVerifier: verifier, redirectUri: 'https://evil.org/steal' })),
+    '400 bad-request', 'user login: only this site\'s callback is accepted as redirect');
+  eq(await code(() => login.refresh({})), '400 bad-request', 'user login: refresh needs a token');
+  tokenReply = { status: 400, body: JSON.stringify({ error: 'invalid_grant' }) };
+  eq(await code(() => login.refresh({ refreshToken: 'old' })), '401 session-expired', 'user login: a dead refresh token means log in again');
+  eq(await code(() => login.login({ code: 'used', codeVerifier: verifier, redirectUri: 'https://x.org/auth/callback' })),
+    '401 login-rejected', 'user login: a used code is reported as rejected');
+  tokenReply = { status: 503, body: 'down' };
+  eq(await code(() => login.refresh({ refreshToken: 'x' })), '502 login-failed', 'user login: Hydra trouble is a 502');
+
+  ok(validRedirect('http://localhost:8098/auth/callback'), 'user login: local testing on localhost works');
+  ok(!validRedirect('http://web.example.org/auth/callback'), 'user login: plain http is refused off localhost');
+  ok(!validRedirect('https://web.example.org/auth/callback?x=1'), 'user login: no extra query on the callback');
+  eq(jwtClaims('not-a-jwt'), null, 'user login: non-JWT tokens are handled');
+
+  const viaApi = createUserLogin({
+    postImpl: async () => ({ status: 200, body: JSON.stringify({ access_token: 'opaque', refresh_token: 'r' }) }),
+    getImpl: async (url) => url.endsWith('/me')
+      ? { status: 200, body: JSON.stringify({ data: { id: '7', attributes: { userName: 'Sera', userId: 7 } } }) }
+      : { status: 200, body: JSON.stringify({ value: 't' }) }
+  });
+  const s3 = await viaApi.refresh({ refreshToken: 'r' });
+  eq(s3.user.name, 'Sera', 'user login: falls back to /me for an opaque token');
+
+  const noChat = createUserLogin({
+    postImpl: async () => ({ status: 200, body: JSON.stringify({ access_token: 'opaque' }) }),
+    getImpl: async () => ({ status: 403, body: '' })
+  });
+  eq(await code(() => noChat.refresh({ refreshToken: 'r' })), '502 login-failed', 'user login: unknown user is an error, not a nameless session');
 }
 
 /* ----------------------------------------------------------- leaderboard */
@@ -274,22 +360,24 @@ async function testProxy() {
 
 /* ----------------------------------------------------------- the real server */
 
-function request(port, p, method) {
+function request(port, p, method, body, headers) {
   return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port, path: p, method: method || 'GET' }, (res) => {
+    const req = http.request({ host: '127.0.0.1', port, path: p, method: method || 'GET', headers: headers || {} }, (res) => {
       let data = '';
       res.on('data', (c) => { data += c; });
       res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
     });
     req.on('error', reject);
-    req.end();
+    req.end(body);
   });
 }
 
 function startServer() {
   const port = 21000 + Math.floor(Math.random() * 10000);
   const proc = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
-    env: Object.assign({}, process.env, { PORT: String(port), FAF_API_CLIENT_ID: '', FAF_API_CLIENT_SECRET: '' }),
+    // The deployment's own settings must not change what the suite expects:
+    // it also runs inside the container, before every auto-update.
+    env: Object.assign({}, process.env, { PORT: String(port), FAF_API_CLIENT_ID: '', FAF_API_CLIENT_SECRET: '', FAF_LOGIN_CLIENT_ID: '' }),
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let out = '';
@@ -322,6 +410,31 @@ async function testServer() {
     eq(hj.ok, true, 'server: health reports ok');
     eq(hj.playTab, true, 'server: health reports the Play tab (open lobbies)');
     eq(hj.serviceLogin, false, 'server: health reports the service login as not configured');
+    eq(hj.chatLogin, true, 'server: health reports the chat login as on');
+
+    const config = await request(s.port, '/api/config');
+    eq(config.status, 200, 'server: /api/config answers');
+    const cj = JSON.parse(config.body);
+    ok(cj.login && typeof cj.login.clientId === 'string', 'server: config carries the login client');
+    eq(cj.chat && cj.chat.channel, '#aeolus', 'server: config names the default channel');
+
+    const json = { 'Content-Type': 'application/json' };
+    const getLogin = await request(s.port, '/api/auth/login');
+    eq(getLogin.status, 405, 'server: login only takes POST');
+    const unknownAuth = await request(s.port, '/api/auth/steal', 'POST', '{}', json);
+    eq(unknownAuth.status, 404, 'server: unknown auth actions are 404');
+    const notJson = await request(s.port, '/api/auth/login', 'POST', 'code=x', { 'Content-Type': 'application/x-www-form-urlencoded' });
+    eq(notJson.status, 415, 'server: login only takes JSON');
+    const badJson = await request(s.port, '/api/auth/login', 'POST', '{nope', json);
+    eq(badJson.status, 400, 'server: broken JSON is a 400');
+    const empty = await request(s.port, '/api/auth/login', 'POST', '{}', json);
+    eq(empty.status, 400, 'server: a login without a code is refused before reaching FAF');
+    eq(JSON.parse(empty.body).code, 'bad-request', 'server: and says so');
+    eq(empty.headers['cache-control'], 'no-store', 'server: auth answers are never cached');
+    const huge = await request(s.port, '/api/auth/refresh', 'POST', JSON.stringify({ refreshToken: 'x'.repeat(20000) }), json);
+    eq(huge.status, 413, 'server: oversized auth bodies are refused');
+    const logout = await request(s.port, '/api/auth/logout', 'POST', '{}', json);
+    eq(logout.status, 200, 'server: logout always succeeds for the browser');
 
     const maps = await request(s.port, '/api/faf/map?page%5Bsize%5D=1');
     eq(maps.status, 503, 'server: FAF API reads without a service login answer 503');
@@ -354,6 +467,7 @@ async function testServer() {
     ok(/frame-src[^;]*faforever\.github\.io/.test(csp), 'server: CSP allows the embedded FAF pages');
     ok(/frame-src[^;]*https:\/\/unitdb\.faforever\.com/.test(csp), 'server: CSP allows the unit database');
     ok(!/frame-src[^;]*\*/.test(csp), 'server: CSP does not allow framing anything');
+    ok(/connect-src 'self' wss:\/\/chat\.faforever\.com(;|$)/.test(csp), 'server: CSP lets the Chat tab reach FAF chat and nothing else');
     eq(index.headers['x-content-type-options'], 'nosniff', 'server: nosniff is set');
 
     // API surface.
@@ -385,7 +499,7 @@ async function testServer() {
 /* ------------------------------------------------------------- auto-update */
 
 const VERIFY_FILES = ['server.js', 'lib/proxy.js', 'lib/static.js', 'lib/upstreams.js',
-  'lib/watcher.js', 'lib/faftoken.js', 'lib/leaderboard.js', 'webtest.js'];
+  'lib/watcher.js', 'lib/faftoken.js', 'lib/leaderboard.js', 'lib/userlogin.js', 'webtest.js'];
 
 /**
  * Stub git/node. On `git clone` it really creates the files verify() looks for,
@@ -539,6 +653,7 @@ async function testWatcher() {
     ['static paths', testStaticPaths],
     ['proxy', testProxy],
     ['service login', testServiceLogin],
+    ['user login', testUserLogin],
     ['leaderboard', testLeaderboard],
     ['server', testServer],
     ['auto-update', testWatcher]
