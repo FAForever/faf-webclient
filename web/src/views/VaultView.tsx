@@ -50,7 +50,9 @@ export function VaultView({ kind }: { kind: "map" | "mod" }) {
       </label>
 
       {load.state === "loading" && <Loading what={`the ${noun} vault`} />}
-      {load.state === "error" && <LoadFailed icon={kind === "map" ? "maps" : "mods"} what={`the ${noun} vault`} status={load.status} />}
+      {load.state === "error" && (
+        <LoadFailed icon={kind === "map" ? "maps" : "mods"} what={`the ${noun} vault`} status={load.status} code={load.code} />
+      )}
       {load.state === "ready" &&
         ((load.data.data ?? []).length === 0 ? (
           <EmptyState icon="search" title={`No ${noun} found`} hint="Try a different search." bordered />

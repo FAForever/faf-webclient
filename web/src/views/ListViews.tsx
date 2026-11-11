@@ -5,32 +5,82 @@ import { LoadFailed, Loading, useJson, ViewHeader } from "./common";
 
 type Row = Record<string, unknown>;
 
+// Status values of the tournament site (Rust client faf-domain state/tourney/tournament.rs).
+const TOURNEY_STATUS: Record<string, { label: string; tone: string }> = {
+  draft: { label: "Draft", tone: "" },
+  signup: { label: "Sign-up open", tone: "is-open" },
+  drafted: { label: "Teams drafted", tone: "is-open" },
+  running: { label: "Running", tone: "is-full" },
+  finished: { label: "Finished", tone: "" },
+};
+
+function teamSize(value: unknown): string | null {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? `${n}v${n}` : null;
+}
+
+function ratingLimit(t: Row): string | null {
+  const min = pick<number>(t, "minRating");
+  const max = pick<number>(t, "maxRating");
+  if (min != null && max != null) return `${min} to ${max}`;
+  if (min != null) return `${min}+`;
+  if (max != null) return `up to ${max}`;
+  return null;
+}
+
 export function TournamentsView() {
-  // The tournament site answers with a bare array.
-  const load = useJson<Row[]>("/api/tourney/tournaments", 60000);
+  // The tournament site answers with a bare array (or { tournaments }).
+  const load = useJson<Row[] | { tournaments?: Row[] }>("/api/tourney/tournaments", 60000);
+  const items = load.state === "ready" ? (Array.isArray(load.data) ? load.data : load.data.tournaments ?? []) : [];
+  // Running first, finished last; anything unrecognised after finished.
+  const order = ["running", "signup", "drafted", "draft", "finished"];
+  const rank = (t: Row) => {
+    const index = order.indexOf(String(pick(t, "status")));
+    return index === -1 ? order.length : index;
+  };
+  const sorted = [...items].sort((a, b) => rank(a) - rank(b));
+
   return (
     <div className="web-view">
-      <ViewHeader title="Tournaments" description="Tournaments from the FAF tournament site." />
+      <ViewHeader title="Tournaments" description="From tournaments.faforever.com." />
       {load.state === "loading" && <Loading what="tournaments" />}
-      {load.state === "error" && <LoadFailed icon="trophy" what="tournaments" status={load.status} />}
+      {load.state === "error" && <LoadFailed icon="trophy" what="tournaments" status={load.status} code={load.code} />}
       {load.state === "ready" &&
-        (load.data.length === 0 ? (
+        (sorted.length === 0 ? (
           <EmptyState icon="trophy" title="No tournaments" bordered />
         ) : (
           <div className="web-list">
-            {load.data.map((t, i) => (
-              <article key={String(pick(t, "id", "slug") ?? i)} className="web-card web-row">
-                <div>
-                  <h2 className="web-card-title">{pick<string>(t, "name", "title") ?? "-"}</h2>
-                  <p className="muted">
-                    {[pick<string>(t, "format", "type"), pick(t, "eventDate", "startDate") ? formatDate(pick(t, "eventDate", "startDate")) : null]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-                <span className="web-chip">{pick<string>(t, "status") ?? "unknown"}</span>
-              </article>
-            ))}
+            {sorted.map((t, i) => {
+              const id = pick<string | number>(t, "id");
+              const status = TOURNEY_STATUS[String(pick(t, "status"))] ?? { label: String(pick(t, "status") ?? "Unknown"), tone: "" };
+              const details = [
+                teamSize(pick(t, "teamSize")),
+                ratingLimit(t),
+                pick(t, "eventDate") ? formatDate(pick(t, "eventDate")) : null,
+              ].filter(Boolean);
+              return (
+                <article key={String(id ?? i)} className="web-card web-row">
+                  <div>
+                    <h2 className="web-card-title">{pick<string>(t, "name") ?? "-"}</h2>
+                    {details.length > 0 && <p className="muted">{details.join(" · ")}</p>}
+                    {pick<string>(t, "prize") && <p className="muted">Prize: {pick<string>(t, "prize")}</p>}
+                  </div>
+                  <div className="web-row-end">
+                    <span className={`web-chip ${status.tone}`}>{status.label}</span>
+                    {id != null && (
+                      <a
+                        className="web-button"
+                        href={`https://tournaments.faforever.com/t/${encodeURIComponent(String(id))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open <Icon name="external" size={13} />
+                      </a>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         ))}
     </div>
@@ -44,7 +94,7 @@ export function EventsView() {
     <div className="web-view">
       <ViewHeader title="Events" description="Community events calendar." />
       {load.state === "loading" && <Loading what="events" />}
-      {load.state === "error" && <LoadFailed icon="calendar" what="events" status={load.status} />}
+      {load.state === "error" && <LoadFailed icon="calendar" what="events" status={load.status} code={load.code} />}
       {load.state === "ready" &&
         (items.length === 0 ? (
           <EmptyState icon="calendar" title="No upcoming events" bordered />

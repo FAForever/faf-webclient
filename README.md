@@ -2,22 +2,39 @@
 
 A view-only FAF website in the design of the FAF Rust client, usable on phones.
 
-Tabs: Play (open lobbies), News, Maps, Mods, Leaderboard, Tournaments, Events, Changelog, Units, Links.
+Tabs: News, Play (open lobbies), Replays, Maps, Mods, Leaderboard, Tournaments, Events, Changelog, Units, Links.
 
 ## How it works
 
 ```
-browser  ──►  faf-web (server.js)  ──►  api.faforever.com            maps, mods, leaderboard
+browser  ──►  faf-web (server.js)  ──►  api.faforever.com            maps, mods, replays (service login)
+                                    ──►  www.faforever.com           leaderboards (public JSON)
                                     ──►  lobby.faforever.com/games    open lobbies
-                                    ──►  tournaments.doodlepros.com   tournaments
+                                    ──►  tournaments.faforever.com    tournaments
                                     ──►  raw.githubusercontent.com   events calendar
 ```
+
+News, Changelog and Units are FAF's own pages, shown in a frame.
 
 - The website runs entirely in the visitor's browser.
 - `server.js` serves the built site from `public/` and proxies a fixed allowlist of read-only upstreams (`lib/upstreams.js`).
 - Every visitor shares one cached copy of each response, so FAF's servers see one client, not one per visitor.
-- The proxy forwards no credentials and only allows GET.
+- The proxy never forwards a visitor's cookies or credentials, and only allows GET.
 - Open lobbies come from the lobby server's public `GET /games` endpoint. Until that endpoint is live, the Play tab says so.
+- Leaderboards come from faforever.com's public JSON (`/leaderboards/<board>.json`). The server pages and searches it, so a phone loads 50 rows, not the whole board.
+- Replay downloads link straight to `replay.faforever.com/<id>`, which needs no login.
+
+## Service login (Maps, Mods, Replays)
+
+FAF's API only answers requests that carry a token; there are no anonymous listings. faf-web gets its token the way faforever.com does, through an OAuth `client_credentials` client of its own (`lib/faftoken.js`).
+
+1. A FAF admin creates the client (gitops-stack `apps/ory-hydra/values.yaml`, "FAF Web (public)") and gives you its secret.
+2. In Dockhand, set two environment variables on the stack:
+   - `FAF_API_CLIENT_ID`: the client id from values.yaml
+   - `FAF_API_CLIENT_SECRET`: the secret
+3. Redeploy. `GET /healthz` shows `"serviceLogin": true`.
+
+Without these variables, those three tabs say the login isn't set up, and everything else works. The token never leaves the server: it is only attached to requests to api.faforever.com.
 
 ## Layout
 
@@ -41,7 +58,7 @@ Commit `web/` and `public/` together. For live editing, run `node server.js` in 
 
 ## Deploying on Dockhand
 
-1. Paste `docker-compose.yml` into a Dockhand stack. It clones this repo and runs `node server.js`. There are no secrets and no volume.
+1. Paste `docker-compose.yml` into a Dockhand stack. It clones this repo and runs `node server.js`. There is no volume. The only secret is the optional service login, set as stack environment variables (see above), never in the file.
 2. Point an Nginx Proxy Manager host at `<host>:8098`, with **Cache Assets OFF**.
 3. Check the log for `listening`. `GET /healthz` reports the state.
 

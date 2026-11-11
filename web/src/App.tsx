@@ -3,6 +3,7 @@ import { Icon, type IconName } from "./ds/Icon";
 import { EmbedView, EventsView, LinksView, TournamentsView } from "./views/ListViews";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { PlayView } from "./views/PlayView";
+import { ReplaysView } from "./views/ReplaysView";
 import { VaultView } from "./views/VaultView";
 
 interface TabDef {
@@ -13,15 +14,17 @@ interface TabDef {
   bottom?: boolean;
 }
 
-// Same order, labels and icons as the Rust client's sidebar (ui/src/features/nav/tabs.tsx).
+// Same order, labels and icons as the Rust client's sidebar (ui/src/features/nav/tabs.tsx),
+// minus the tabs that need a login (Chat, Training, Settings).
 const TABS: TabDef[] = [
-  { id: "play", label: "Play", icon: "play", Component: PlayView },
   {
     id: "news",
     label: "News",
     icon: "news",
     Component: () => <EmbedView title="News" description="The FAF news hub." url="https://www.faforever.com/newshub" />,
   },
+  { id: "play", label: "Play", icon: "play", Component: PlayView },
+  { id: "replays", label: "Replays", icon: "replays", Component: ReplaysView },
   { id: "maps", label: "Maps", icon: "maps", Component: () => <VaultView kind="map" /> },
   { id: "mods", label: "Mods", icon: "mods", Component: () => <VaultView kind="mod" /> },
   { id: "leaderboard", label: "Leaderboard", icon: "leaderboard", Component: LeaderboardView },
@@ -37,7 +40,7 @@ const TABS: TabDef[] = [
     id: "units",
     label: "Units",
     icon: "units",
-    Component: () => <EmbedView title="Units" description="Stats for every unit." url="https://faforever.github.io/etfreeman-db/" />,
+    Component: () => <EmbedView title="Units" description="Stats for every unit." url="https://unitdb.faforever.com/" />,
   },
   { id: "links", label: "Links", icon: "external", Component: LinksView, bottom: true },
 ];

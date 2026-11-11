@@ -21,6 +21,8 @@ const { resolve } = require('./lib/upstreams');
 const { createCache, proxyGet, UPSTREAM_HEADERS } = require('./lib/proxy');
 const { resolveFile } = require('./lib/static');
 const { createWatcher, redactUrl } = require('./lib/watcher');
+const { createTokenSource } = require('./lib/faftoken');
+const { boardTarget, pageOf, PAGE_SIZE } = require('./lib/leaderboard');
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -69,8 +71,88 @@ function testUpstreams() {
   eq(resolve('events', 'other.json', ''), null, 'upstream: only the calendar file is reachable');
 
   const t = resolve('tourney', 'tournaments', '');
-  ok(t && t.url === 'https://tournaments.doodlepros.com/api/tournaments',
-    'upstream: the tourney API resolves', t && t.url);
+  ok(t && t.url === 'https://tournaments.faforever.com/api/tournaments',
+    'upstream: the tourney API resolves to FAF\'s host', t && t.url);
+  eq(t && t.needsServiceLogin, false, 'upstream: the tourney API needs no service login');
+
+  const g = resolve('faf', 'game', '?sort=-endTime');
+  ok(g && g.url.startsWith('https://api.faforever.com/data/game?'), 'upstream: replays (game) resolve', g && g.url);
+  eq(g && g.needsServiceLogin, true, 'upstream: FAF API reads are marked as needing the service login');
+}
+
+/* --------------------------------------------------------- service login */
+async function testServiceLogin() {
+  let seen = null;
+  const capture = async (url, opts) => {
+    seen = opts && opts.headers;
+    return { status: 200, contentType: 'application/json', body: Buffer.from('{}') };
+  };
+  await proxyGet({ url: 'https://api.faforever.com/data/game', ttlMs: 1 }, createCache(),
+    { fetchImpl: capture, headers: { Authorization: 'Bearer t' } });
+  eq(seen && seen.Authorization, 'Bearer t', 'login: the proxy forwards the Authorization header upstream');
+
+  eq(createTokenSource({}), null, 'login: no client configured gives no token source');
+  eq(createTokenSource({ clientId: 'a' }), null, 'login: a client without a secret gives no token source');
+
+  let clock = 1_000_000;
+  const calls = [];
+  const post = async (url, form) => {
+    calls.push({ url, form });
+    return { status: 200, body: JSON.stringify({ access_token: 'tok' + calls.length, expires_in: 3600 }) };
+  };
+  const src = createTokenSource({ clientId: 'id', clientSecret: 'sec', postImpl: post, now: () => clock });
+
+  const [a, b] = await Promise.all([src.get(), src.get()]);
+  eq(calls.length, 1, 'login: concurrent requests share one token request');
+  eq(a + b, 'tok1tok1', 'login: both callers get the token');
+  eq(calls[0].url, 'https://hydra.faforever.com/oauth2/token', 'login: tokens come from FAF\'s Hydra');
+  eq(calls[0].form.grant_type, 'client_credentials', 'login: uses the client_credentials grant');
+  eq(calls[0].form.client_secret, 'sec', 'login: sends the secret in the body (client_secret_post)');
+
+  clock += 30 * 60_000;
+  eq(await src.get(), 'tok1', 'login: a valid token is reused');
+  clock += 30 * 60_000;
+  eq(await src.get(), 'tok2', 'login: an expiring token is renewed early');
+  src.invalidate();
+  eq(await src.get(), 'tok3', 'login: invalidate forces a new token');
+
+  const bad = createTokenSource({
+    clientId: 'id', clientSecret: 'wrong', now: () => clock,
+    postImpl: async () => ({ status: 401, body: JSON.stringify({ error: 'invalid_client' }) })
+  });
+  let msg = '';
+  try { await bad.get(); } catch (err) { msg = err.message; }
+  ok(/401 invalid_client/.test(msg), 'login: a rejected client reports why', msg);
+  ok(!msg.includes('wrong'), 'login: the error never contains the secret');
+}
+
+/* ----------------------------------------------------------- leaderboard */
+function testLeaderboard() {
+  eq(boardTarget('global').url, 'https://www.faforever.com/leaderboards/global.json', 'leaderboard: global maps to faforever.com');
+  eq(boardTarget('4v4').url, 'https://www.faforever.com/leaderboards/4v4.json', 'leaderboard: 4v4 maps to faforever.com');
+  eq(boardTarget('../x'), null, 'leaderboard: anything off the list is refused');
+  eq(boardTarget('constructor'), null, 'leaderboard: prototype names are refused');
+
+  const rows = [];
+  for (let i = 0; i < 120; i++) {
+    rows.push({ playerId: i, rating: 2000 - i + 0.4, totalgames: 100 + i, wonGames: 50, date: 'x', label: i === 77 ? 'Nuggets' : 'player' + i });
+  }
+  const body = Buffer.from(JSON.stringify(rows));
+
+  const p1 = pageOf(body, {});
+  eq(p1.total, 120, 'leaderboard: counts every player');
+  eq(p1.pages, Math.ceil(120 / PAGE_SIZE), 'leaderboard: page count');
+  eq(p1.rows.length, PAGE_SIZE, 'leaderboard: one page of rows');
+  eq(p1.rows[0].rank + '/' + p1.rows[0].rating, '1/2000', 'leaderboard: rank and rounded rating');
+
+  const last = pageOf(body, { page: '99' });
+  eq(last.page, last.pages, 'leaderboard: a page past the end clamps to the last page');
+  eq(pageOf(body, { page: 'abc' }).page, 1, 'leaderboard: a junk page number means page 1');
+
+  const found = pageOf(body, { query: 'NUGG' });
+  eq(found.total, 1, 'leaderboard: search is case-insensitive');
+  eq(found.rows[0].rank, 78, 'leaderboard: search keeps the real rank');
+  eq(pageOf(body, { query: 'nobody' }).total, 0, 'leaderboard: no match is an empty page');
 }
 
 /* ------------------------------------------------ static paths (security) */
@@ -182,7 +264,7 @@ function request(port, p, method) {
 function startServer() {
   const port = 21000 + Math.floor(Math.random() * 10000);
   const proc = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
-    env: Object.assign({}, process.env, { PORT: String(port) }),
+    env: Object.assign({}, process.env, { PORT: String(port), FAF_API_CLIENT_ID: '', FAF_API_CLIENT_SECRET: '' }),
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let out = '';
@@ -214,6 +296,14 @@ async function testServer() {
     const hj = JSON.parse(health.body);
     eq(hj.ok, true, 'server: health reports ok');
     eq(hj.playTab, true, 'server: health reports the Play tab (open lobbies)');
+    eq(hj.serviceLogin, false, 'server: health reports the service login as not configured');
+
+    const maps = await request(s.port, '/api/faf/map?page%5Bsize%5D=1');
+    eq(maps.status, 503, 'server: FAF API reads without a service login answer 503');
+    eq(JSON.parse(maps.body).code, 'service-login-missing', 'server: and say why, so the page can explain it');
+
+    const lb = await request(s.port, '/api/leaderboard/nope');
+    eq(lb.status, 404, 'server: an unknown leaderboard is a 404');
 
     const index = await request(s.port, '/');
     eq(index.status, 200, 'server: the app shell is served');
@@ -237,6 +327,7 @@ async function testServer() {
     const csp = index.headers['content-security-policy'] || '';
     ok(/script-src 'self'/.test(csp), 'server: CSP restricts scripts to this origin');
     ok(/frame-src[^;]*faforever\.github\.io/.test(csp), 'server: CSP allows the embedded FAF pages');
+    ok(/frame-src[^;]*https:\/\/unitdb\.faforever\.com/.test(csp), 'server: CSP allows the unit database');
     ok(!/frame-src[^;]*\*/.test(csp), 'server: CSP does not allow framing anything');
     eq(index.headers['x-content-type-options'], 'nosniff', 'server: nosniff is set');
 
@@ -269,7 +360,7 @@ async function testServer() {
 /* ------------------------------------------------------------- auto-update */
 
 const VERIFY_FILES = ['server.js', 'lib/proxy.js', 'lib/static.js', 'lib/upstreams.js',
-  'lib/watcher.js', 'webtest.js'];
+  'lib/watcher.js', 'lib/faftoken.js', 'lib/leaderboard.js', 'webtest.js'];
 
 /**
  * Stub git/node. On `git clone` it really creates the files verify() looks for,
@@ -422,6 +513,8 @@ async function testWatcher() {
     ['upstream allowlist', testUpstreams],
     ['static paths', testStaticPaths],
     ['proxy', testProxy],
+    ['service login', testServiceLogin],
+    ['leaderboard', testLeaderboard],
     ['server', testServer],
     ['auto-update', testWatcher]
   ];

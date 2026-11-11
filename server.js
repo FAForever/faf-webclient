@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * faf-web - the FAF mobile web client.
+ * faf-web - a view-only FAF website in the Rust client's design.
  *
  * One process does two jobs:
  *   1. serves the app out of public/
@@ -10,12 +10,12 @@
  * Job 2 exists so the browser only ever talks to this origin. That removes the
  * CORS question entirely: it does not matter whether api.faforever.com allows
  * browser origins, because no browser ever calls it directly. It also means
- * tournaments.doodlepros.com does not need CORS headers added, which would
- * otherwise have been a change to a second codebase.
+ * the tournament site does not need CORS headers added.
  *
- * There is no Play tab and no lobby code. That is deliberate and is the reason
- * this service needs no secrets, no database and no authentication: every tab
- * in this build reads public data.
+ * No database and no user logins. The one optional secret is the service login
+ * for FAF's API (FAF_API_CLIENT_ID / FAF_API_CLIENT_SECRET, lib/faftoken.js),
+ * which Maps, Mods and Replays need because FAF's API serves no anonymous
+ * listings. Without it those tabs say so; everything else still works.
  *
  * Zero runtime dependencies, no build step. Upload the files, restart the
  * container.
@@ -28,6 +28,8 @@ const { resolve: resolveUpstream } = require('./lib/upstreams');
 const { createCache, proxyGet } = require('./lib/proxy');
 const { resolveFile, cacheHeader } = require('./lib/static');
 const { createWatcher } = require('./lib/watcher');
+const { createTokenSource } = require('./lib/faftoken');
+const { boardTarget, pageOf } = require('./lib/leaderboard');
 
 const PORT = Number(process.env.PORT || 8098);
 // Auto-update. Off unless AUTO_UPDATE=1, so nothing changes for anyone who
@@ -40,6 +42,11 @@ const APP_DIR = process.env.APP_DIR || __dirname;
 const PUBLIC_DIR = path.resolve(__dirname, 'public');
 const started = Date.now();
 const cache = createCache();
+const serviceLogin = createTokenSource({
+  clientId: process.env.FAF_API_CLIENT_ID,
+  clientSecret: process.env.FAF_API_CLIENT_SECRET,
+  tokenUrl: process.env.FAF_OAUTH_TOKEN_URL || undefined
+});
 let watcher = null;
 
 /* ------------------------------------------------------------------ logging */
@@ -68,10 +75,12 @@ function securityHeaders() {
     'Referrer-Policy': 'strict-origin-when-cross-origin',
     // The app embeds three upstream pages (news, changelog, unit db) in
     // iframes, so frame-src has to name them. Everything else is same-origin.
+    // The unit db moved from faforever.github.io/etfreeman-db to its own
+    // domain in November 2026; the old address redirects there.
     'Content-Security-Policy': [
       "default-src 'self'",
       "img-src 'self' https://content.faforever.com data:",
-      "frame-src https://www.faforever.com https://faforever.github.io https://www.youtube-nocookie.com",
+      "frame-src https://www.faforever.com https://faforever.github.io https://unitdb.faforever.com https://www.youtube-nocookie.com",
       "connect-src 'self'",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self'",
@@ -95,6 +104,11 @@ async function handleApi(req, res, url) {
   const routeName = parts[1];
   const rest = parts.slice(2).join('/');
 
+  if (routeName === 'leaderboard') {
+    await handleLeaderboard(res, rest, url);
+    return;
+  }
+
   const target = resolveUpstream(routeName, rest, url.search);
   if (!target) {
     // Deliberately identical answer for "unknown route" and "blocked resource",
@@ -103,8 +117,28 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  const opts = {};
+  if (target.needsServiceLogin) {
+    if (!serviceLogin) {
+      sendJson(res, 503, {
+        error: 'FAF API service login is not configured',
+        code: 'service-login-missing'
+      });
+      return;
+    }
+    try {
+      opts.headers = { Authorization: 'Bearer ' + await serviceLogin.get() };
+    } catch (err) {
+      log('error', 'service login failed', { reason: err.message });
+      sendJson(res, 502, { error: 'FAF API service login failed', code: 'service-login-failed' });
+      return;
+    }
+  }
+
   const t0 = Date.now();
-  const out = await proxyGet(target, cache);
+  const out = await proxyGet(target, cache, opts);
+  // A token revoked or expired early: fetch a fresh one on the next request.
+  if (target.needsServiceLogin && out.status === 401) serviceLogin.invalidate();
   log(out.status >= 400 ? 'warn' : 'info', 'proxy', {
     route: routeName, rest, status: out.status,
     ms: Date.now() - t0, cached: out.cached, bytes: out.body.length
@@ -117,6 +151,42 @@ async function handleApi(req, res, url) {
     'X-Cache': out.cached ? 'HIT' : 'MISS'
   }, securityHeaders()));
   res.end(out.body);
+}
+
+/** /api/leaderboard/<board>?page=N&q=name - one page of a public leaderboard. */
+async function handleLeaderboard(res, board, url) {
+  const target = boardTarget(board);
+  if (!target) {
+    sendJson(res, 404, { error: 'unknown endpoint' });
+    return;
+  }
+  const t0 = Date.now();
+  const out = await proxyGet(target, cache);
+  log(out.status >= 400 ? 'warn' : 'info', 'proxy', {
+    route: 'leaderboard', rest: board, status: out.status,
+    ms: Date.now() - t0, cached: out.cached, bytes: out.body.length
+  });
+  if (out.status !== 200) {
+    res.writeHead(out.status, Object.assign({
+      'Content-Type': out.contentType,
+      'Content-Length': out.body.length,
+      'Cache-Control': 'no-store'
+    }, securityHeaders()));
+    res.end(out.body);
+    return;
+  }
+  let page;
+  try {
+    page = pageOf(out.body, {
+      page: url.searchParams.get('page'),
+      query: url.searchParams.get('q') || ''
+    });
+  } catch (err) {
+    log('error', 'leaderboard unreadable', { board, reason: err.message });
+    sendJson(res, 502, { error: 'leaderboard data was unreadable' });
+    return;
+  }
+  sendJson(res, 200, page, { 'X-Cache': out.cached ? 'HIT' : 'MISS' });
 }
 
 function handleStatic(req, res, url) {
@@ -168,6 +238,7 @@ const server = http.createServer((req, res) => {
       uptimeSeconds: Math.floor((Date.now() - started) / 1000),
       cacheEntries: cache.size(),
       playTab: true,
+      serviceLogin: Boolean(serviceLogin),
       autoUpdate: watcher ? watcher.status() : { enabled: false }
     });
     return;

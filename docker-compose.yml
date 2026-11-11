@@ -45,4 +45,11 @@ services:
       # Minimum 30000. One cheap `git ls-remote` per interval.
       UPDATE_INTERVAL_MS: "60000"
 
+      # Service login for FAF's API. Maps, Mods and Replays need it: FAF's API
+      # has no anonymous listings. Set both values in Dockhand's environment
+      # for this stack, never in this file - the file is public on GitHub.
+      # Leave them empty and those three tabs say the login is missing.
+      FAF_API_CLIENT_ID: "${FAF_API_CLIENT_ID:-}"
+      FAF_API_CLIENT_SECRET: "${FAF_API_CLIENT_SECRET:-}"
+
     command: ["sh", "-c", "set -e; rm -rf /app; mkdir -p /app; git clone --depth 1 --branch main https://github.com/Nuggets75/faf-web.git /app; cd /app; exec node server.js"]

@@ -5,7 +5,7 @@ import type { IconName } from "../ds/Icon";
 
 export type Load<T> =
   | { state: "loading" }
-  | { state: "error"; status: number | null; message: string }
+  | { state: "error"; status: number | null; code: string | null; message: string }
   | { state: "ready"; data: T };
 
 /**
@@ -32,6 +32,7 @@ export function useJson<T>(path: string | null, refreshMs?: number): Load<T> {
               : {
                   state: "error",
                   status: error instanceof ApiError ? error.status : null,
+                  code: error instanceof ApiError ? error.code : null,
                   message: error instanceof Error ? error.message : String(error),
                 },
           );
@@ -69,7 +70,21 @@ export function Loading({ what }: { what: string }) {
   );
 }
 
-export function LoadFailed({ icon, what, status }: { icon: IconName; what: string; status: number | null }) {
+export function LoadFailed({ icon, what, status, code }: { icon: IconName; what: string; status: number | null; code?: string | null }) {
+  if (code === "service-login-missing" || code === "service-login-failed") {
+    return (
+      <EmptyState
+        icon={icon}
+        title={`Can't show ${what} yet`}
+        hint={
+          code === "service-login-missing"
+            ? "FAF's API only answers logged-in requests, and this site's login to it isn't set up yet."
+            : "This site's login to FAF's API was refused. Try again later."
+        }
+        bordered
+      />
+    );
+  }
   return (
     <EmptyState
       icon={icon}

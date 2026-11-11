@@ -2,14 +2,24 @@
 // an allowlisted set of read-only upstreams and caches them for all visitors.
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  /** `code` is set by server.js for failures it explains, e.g. "service-login-missing". */
+  constructor(public status: number, message: string, public code: string | null = null) {
     super(message);
   }
 }
 
 export async function getJson<T = unknown>(path: string, signal?: AbortSignal): Promise<T> {
   const res = await fetch(path, { signal, headers: { Accept: "application/json" } });
-  if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    let code: string | null = null;
+    try {
+      const body = (await res.json()) as { code?: unknown };
+      if (typeof body.code === "string") code = body.code;
+    } catch {
+      // Not JSON; the status says enough.
+    }
+    throw new ApiError(res.status, `${res.status} ${res.statusText}`, code);
+  }
   return (await res.json()) as T;
 }
 
