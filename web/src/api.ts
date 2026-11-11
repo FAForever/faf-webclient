@@ -1,6 +1,8 @@
 // Every request goes to this site's own /api routes (server.js), which proxies
 // an allowlisted set of read-only upstreams and caches them for all visitors.
 
+import { fafUrl } from "./hosts";
+
 export class ApiError extends Error {
   /** `code` is set by server.js for failures it explains, e.g. "service-login-missing". */
   constructor(public status: number, message: string, public code: string | null = null) {
@@ -61,7 +63,7 @@ export function related(doc: JsonApiDocument, resource: JsonApiResource, name: s
 }
 
 export function mapPreviewUrl(folderName: string, size: "small" | "large" = "small"): string {
-  return `https://content.faforever.com/maps/previews/${size}/${encodeURIComponent(folderName)}.png`;
+  return `${fafUrl("content")}/maps/previews/${size}/${encodeURIComponent(folderName)}.png`;
 }
 
 export function formatDate(value: unknown): string {

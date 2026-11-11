@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Icon, type IconName } from "./ds/Icon";
+import { fafUrl } from "./hosts";
 import { ChatView } from "./views/ChatView";
 import { ErrorBoundary } from "./views/ErrorBoundary";
 import { EmbedView, EventsView, LinksView, TournamentsView } from "./views/ListViews";
@@ -23,7 +24,7 @@ const TABS: TabDef[] = [
     id: "news",
     label: "News",
     icon: "news",
-    Component: () => <EmbedView title="News" description="The FAF news hub." url="https://www.faforever.com/newshub" />,
+    Component: () => <EmbedView title="News" description="The FAF news hub." url={`${fafUrl("www")}/newshub`} />,
   },
   { id: "chat", label: "Chat", icon: "chat", Component: ChatView },
   { id: "play", label: "Play", icon: "play", Component: PlayView },

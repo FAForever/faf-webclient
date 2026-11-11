@@ -1,8 +1,9 @@
 {
-  "name": "faf-web",
+  "name": "faf-webclient",
   "version": "0.1.0",
   "private": true,
-  "description": "View-only FAF web client in the Rust client's design. Serves the built app from public/ and proxies read-only FAF APIs.",
+  "description": "FAF's web client in the Rust client's design, at webclient.faforever.com. Serves the built app from public/ and proxies read-only FAF APIs.",
+  "repository": "github:FAForever/webclient",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

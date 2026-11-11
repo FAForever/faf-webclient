@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fafPath, mapPreviewUrl, pick, related, type JsonApiDocument, type JsonApiResource } from "../api";
 import { EmptyState } from "../ds/EmptyState";
 import { Icon } from "../ds/Icon";
+import { fafUrl } from "../hosts";
 import { LoadFailed, Loading, useJson, ViewHeader } from "./common";
 
 const PAGE_SIZE = 20;
@@ -108,7 +109,7 @@ function ReplayCard({ doc, game }: { doc: JsonApiDocument; game: JsonApiResource
         <div className="web-card-actions">
           <span className="muted">#{game.id}</span>
           {available ? (
-            <a className="web-button" href={`https://replay.faforever.com/${encodeURIComponent(game.id)}`} rel="noopener noreferrer">
+            <a className="web-button" href={`${fafUrl("replay")}/${encodeURIComponent(game.id)}`} rel="noopener noreferrer">
               Download replay
             </a>
           ) : (
@@ -137,7 +138,7 @@ function replayIdFrom(text: string): string | null {
 function DownloadById() {
   const [text, setText] = useState("");
   const id = replayIdFrom(text);
-  const href = id ? `https://replay.faforever.com/${id}` : undefined;
+  const href = id ? `${fafUrl("replay")}/${id}` : undefined;
 
   return (
     <form

@@ -1,7 +1,8 @@
-# faf-web - Dockhand stack
+# FAF webclient - a private test server (Dockhand stack)
 #
-# Same pattern as the tournament site and uid-relay: no image build, the
-# container clones the repo at start and runs it.
+# FAF itself runs the image built from this repo (Dockerfile, gitops-stack
+# apps/faf-webclient). This file is for running your own copy: no image build,
+# the container clones the repo at start and runs it.
 #
 # This service has NO database and NO volume. It serves static files, proxies
 # read-only public APIs and relays the Chat tab's login, so there is nothing to
@@ -57,4 +58,4 @@ services:
       # created the client.
       FAF_LOGIN_CLIENT_ID: "${FAF_LOGIN_CLIENT_ID:-}"
 
-    command: ["sh", "-c", "set -e; rm -rf /app; mkdir -p /app; git clone --depth 1 --branch main https://github.com/Nuggets75/faf-web.git /app; cd /app; exec node server.js"]
+    command: ["sh", "-c", "set -e; rm -rf /app; mkdir -p /app; git clone --depth 1 --branch main https://github.com/FAForever/webclient.git /app; cd /app; exec node server.js"]

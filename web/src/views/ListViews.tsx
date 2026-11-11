@@ -1,6 +1,7 @@
 import { formatDate, pick } from "../api";
 import { EmptyState } from "../ds/EmptyState";
 import { Icon, type IconName } from "../ds/Icon";
+import { fafUrl } from "../hosts";
 import { LoadFailed, Loading, useJson, ViewHeader } from "./common";
 
 type Row = Record<string, unknown>;
@@ -61,7 +62,7 @@ export function TournamentsView() {
 
   return (
     <div className="web-view">
-      <ViewHeader title="Tournaments" description="From tournaments.faforever.com." />
+      <ViewHeader title="Tournaments" description={`From ${fafUrl("tournaments").replace("https://", "")}.`} />
       {load.state === "loading" && <Loading what="tournaments" />}
       {load.state === "error" && <LoadFailed icon="trophy" what="tournaments" status={load.status} code={load.code} />}
       {load.state === "ready" &&
@@ -93,7 +94,7 @@ export function TournamentsView() {
                     {id != null && (
                       <a
                         className="web-button"
-                        href={`https://tournaments.faforever.com/t/${encodeURIComponent(String(id))}`}
+                        href={`${fafUrl("tournaments")}/t/${encodeURIComponent(String(id))}`}
                         target="_blank"
                         rel="noopener noreferrer"
                       >

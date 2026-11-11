@@ -15,7 +15,12 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
+
+// The suite checks the real FAF host names. The deployment's own setting
+// (FAF_BASE_DOMAIN=faforever.xyz on FAF's test cluster) must not change that:
+// the suite also runs inside a container before every auto-update.
+delete process.env.FAF_BASE_DOMAIN;
 
 const { resolve } = require('./lib/upstreams');
 const { createCache, proxyGet, UPSTREAM_HEADERS } = require('./lib/proxy');
@@ -212,6 +217,47 @@ async function testUserLogin() {
   eq(await code(() => noChat.refresh({ refreshToken: 'r' })), '502 login-failed', 'user login: unknown user is an error, not a nameless session');
 }
 
+/* ----------------------------------------------------------- base domain */
+
+function testBaseDomain() {
+  // A fresh process per setting: the host names are fixed when the modules load.
+  function hostsWith(domain) {
+    const script = `
+      const { resolve } = require('./lib/upstreams');
+      const { boardTarget } = require('./lib/leaderboard');
+      const { DEFAULT_TOKEN_URL } = require('./lib/faftoken');
+      const login = require('./lib/userlogin').createUserLogin().config();
+      console.log(JSON.stringify({
+        api: resolve('faf', 'map', '').url,
+        lobby: resolve('lobby', 'games', '').url,
+        tourney: resolve('tourney', 'tournaments', '').url,
+        board: boardTarget('global').url,
+        token: DEFAULT_TOKEN_URL,
+        authorize: login.login.authorizeUrl,
+        chat: login.chat.url
+      }));`;
+    const out = spawnSync(process.execPath, ['-e', script], {
+      cwd: __dirname, encoding: 'utf8', env: Object.assign({}, process.env, { FAF_BASE_DOMAIN: domain })
+    });
+    return out.status === 0 ? JSON.parse(out.stdout) : { failed: out.stderr };
+  }
+
+  const test = hostsWith('faforever.xyz');
+  eq(test.api, 'https://api.faforever.xyz/data/map', 'base domain: the test site reads the test API');
+  eq(test.lobby, 'https://lobby.faforever.xyz/games', 'base domain: and the test lobby server');
+  eq(test.tourney, 'https://tournaments.faforever.xyz/api/tournaments', 'base domain: and test tournaments');
+  eq(test.board, 'https://www.faforever.xyz/leaderboards/global.json', 'base domain: and the test website');
+  eq(test.token, 'https://hydra.faforever.xyz/oauth2/token', 'base domain: service login at the test Hydra');
+  eq(test.authorize, 'https://hydra.faforever.xyz/oauth2/auth', 'base domain: player login at the test Hydra');
+  eq(test.chat, 'wss://chat.faforever.xyz', 'base domain: chat on the test chat server');
+
+  const unset = hostsWith('');
+  eq(unset.api, 'https://api.faforever.com/data/map', 'base domain: unset means faforever.com');
+
+  const bad = hostsWith('evil.example/x');
+  ok(bad.failed && /FAF_BASE_DOMAIN/.test(bad.failed), 'base domain: anything but a domain name refuses to start');
+}
+
 /* ----------------------------------------------------------- leaderboard */
 function testLeaderboard() {
   eq(boardTarget('global').url, 'https://www.faforever.com/leaderboards/global.json', 'leaderboard: global maps to faforever.com');
@@ -377,7 +423,7 @@ function startServer() {
   const proc = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
     // The deployment's own settings must not change what the suite expects:
     // it also runs inside the container, before every auto-update.
-    env: Object.assign({}, process.env, { PORT: String(port), FAF_API_CLIENT_ID: '', FAF_API_CLIENT_SECRET: '', FAF_LOGIN_CLIENT_ID: '' }),
+    env: Object.assign({}, process.env, { PORT: String(port), FAF_API_CLIENT_ID: '', FAF_API_CLIENT_SECRET: '', FAF_LOGIN_CLIENT_ID: '', FAF_BASE_DOMAIN: '' }),
     stdio: ['ignore', 'pipe', 'pipe']
   });
   let out = '';
@@ -417,6 +463,7 @@ async function testServer() {
     const cj = JSON.parse(config.body);
     ok(cj.login && typeof cj.login.clientId === 'string', 'server: config carries the login client');
     eq(cj.chat && cj.chat.channel, '#aeolus', 'server: config names the default channel');
+    eq(cj.baseDomain, 'faforever.com', 'server: config tells the site which FAF it belongs to');
 
     const json = { 'Content-Type': 'application/json' };
     const getLogin = await request(s.port, '/api/auth/login');
@@ -499,7 +546,7 @@ async function testServer() {
 /* ------------------------------------------------------------- auto-update */
 
 const VERIFY_FILES = ['server.js', 'lib/proxy.js', 'lib/static.js', 'lib/upstreams.js',
-  'lib/watcher.js', 'lib/faftoken.js', 'lib/leaderboard.js', 'lib/userlogin.js', 'webtest.js'];
+  'lib/watcher.js', 'lib/faftoken.js', 'lib/leaderboard.js', 'lib/userlogin.js', 'lib/hosts.js', 'webtest.js'];
 
 /**
  * Stub git/node. On `git clone` it really creates the files verify() looks for,
@@ -647,13 +694,14 @@ async function testWatcher() {
 /* ------------------------------------------------------------------- main */
 
 (async () => {
-  console.log('faf-web suite\n');
+  console.log('FAF webclient suite\n');
   const blocks = [
     ['upstream allowlist', testUpstreams],
     ['static paths', testStaticPaths],
     ['proxy', testProxy],
     ['service login', testServiceLogin],
     ['user login', testUserLogin],
+    ['base domain', testBaseDomain],
     ['leaderboard', testLeaderboard],
     ['server', testServer],
     ['auto-update', testWatcher]

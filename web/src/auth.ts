@@ -24,6 +24,8 @@ export interface Session {
 }
 
 export interface SiteConfig {
+  /** faforever.com, or faforever.xyz on FAF's test servers. */
+  baseDomain?: string;
   login: { clientId: string; authorizeUrl: string; scope: string; callbackPath: string } | null;
   chat: { url: string; channel: string } | null;
 }

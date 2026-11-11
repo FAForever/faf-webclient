@@ -1,7 +1,8 @@
 'use strict';
 
 /**
- * faf-web - a view-only FAF website in the Rust client's design.
+ * FAF webclient - a FAF website in the Rust client's design, hosted by FAF at
+ * webclient.faforever.com (gitops-stack apps/faf-webclient).
  *
  * One process does two jobs:
  *   1. serves the app out of public/
@@ -21,6 +22,8 @@
  * relays the login calls the browser cannot make itself and keeps nothing:
  * the chat connection goes from the browser straight to FAF's chat server.
  *
+ * FAF_BASE_DOMAIN (lib/hosts.js) picks FAF's real servers or its test ones.
+ *
  * Zero runtime dependencies, no build step. Upload the files, restart the
  * container.
  */
@@ -35,6 +38,7 @@ const { createWatcher } = require('./lib/watcher');
 const { createTokenSource } = require('./lib/faftoken');
 const { createUserLogin, CHAT_URL } = require('./lib/userlogin');
 const { boardTarget, pageOf, apiTarget, pageFromApi } = require('./lib/leaderboard');
+const { BASE_DOMAIN, fafUrl } = require('./lib/hosts');
 
 const PORT = Number(process.env.PORT || 8098);
 // Auto-update. Off unless AUTO_UPDATE=1, so nothing changes for anyone who
@@ -89,8 +93,10 @@ function securityHeaders() {
     // domain in November 2026; the old address redirects there.
     'Content-Security-Policy': [
       "default-src 'self'",
-      "img-src 'self' https://content.faforever.com data:",
-      "frame-src https://www.faforever.com https://faforever.github.io https://unitdb.faforever.com https://www.youtube-nocookie.com",
+      "img-src 'self' " + fafUrl('content') + " data:",
+      // News is FAF's own site, so it follows the base domain; the changelog
+      // and unit db exist only once.
+      "frame-src " + fafUrl('www') + " https://faforever.github.io https://unitdb.faforever.com https://www.youtube-nocookie.com",
       // The Chat tab talks to FAF's chat server directly over a WebSocket.
       "connect-src 'self' " + CHAT_URL,
       "style-src 'self' 'unsafe-inline'",
@@ -109,7 +115,9 @@ async function handleApi(req, res, url) {
     return;
   }
   if (url.pathname === '/api/config' && req.method === 'GET') {
-    sendJson(res, 200, userLogin ? userLogin.config() : { login: null, chat: null });
+    // The site needs the base domain for its own links (map previews,
+    // replay downloads, news).
+    sendJson(res, 200, Object.assign({ baseDomain: BASE_DOMAIN }, userLogin ? userLogin.config() : { login: null, chat: null }));
     return;
   }
   if (req.method !== 'GET') {
@@ -216,7 +224,7 @@ async function handleLeaderboard(res, board, url) {
   }, out.via || {}));
   if (!viaApi && out.status === 403) {
     sendJson(res, 502, {
-      error: 'www.faforever.com refused this server\'s request',
+      error: 'www.' + BASE_DOMAIN + ' refused this server\'s request',
       code: 'leaderboard-refused'
     });
     return;
@@ -362,7 +370,8 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/healthz') {
     sendJson(res, 200, {
       ok: true,
-      service: 'faf-web',
+      service: 'faf-webclient',
+      baseDomain: BASE_DOMAIN,
       uptimeSeconds: Math.floor((Date.now() - started) / 1000),
       cacheEntries: cache.size(),
       playTab: true,

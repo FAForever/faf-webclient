@@ -1,13 +1,13 @@
-# faf-web
+# FAF webclient
 
-A FAF website in the design of the FAF Rust client, usable on phones. Everything is view-only and needs no account, except the Chat tab, which needs a FAF login.
+FAF's web client at **webclient.faforever.com**, in the design of the FAF Rust client and usable on phones. Everything is view-only and needs no account, except the Chat tab, which needs a FAF login.
 
 Tabs: News, Chat, Play (open lobbies), Replays, Maps, Mods, Leaderboard, Tournaments, Events, Changelog, Units, Links.
 
 ## How it works
 
 ```
-browser  ──►  faf-web (server.js)  ──►  api.faforever.com            maps, mods, replays, leaderboards (service login)
+browser  ──►  webclient (server.js) ──►  api.faforever.com            maps, mods, replays, leaderboards (service login)
                                     ──►  www.faforever.com           leaderboards without the login (public JSON)
                                     ──►  lobby.faforever.com          open lobbies, live games, matchmaker queues
                                     ──►  tournaments.faforever.com    tournaments
@@ -25,17 +25,18 @@ News, Changelog and Units are FAF's own pages, shown in a frame.
 - Open lobbies come from the lobby server's public `GET /games` endpoint (FAForever/server PR "Public endpoints for the game list and matchmaker queues", which also adds live games and `GET /matchmaker`). Until it is live, the Play tab says so.
 - Leaderboards come from FAF's API when the service login is set up, otherwise from faforever.com's public JSON (`/leaderboards/<board>.json`), which the server pages and searches. faforever.com is behind Cloudflare and may refuse a server's request; the log line then shows `"server":"cloudflare"`, and the tab says so.
 - Replays can be downloaded by ID with no login at all: `replay.faforever.com/<id>` redirects to the API's public replay download.
-- Replay downloads link straight to `replay.faforever.com/<id>`, which needs no login.
+- FAF also runs a test copy at webclient.faforever.xyz. `FAF_BASE_DOMAIN=faforever.xyz` makes every host name above point at FAF's test servers instead (`lib/hosts.js`); the site gets the same setting from `/api/config`.
 
 ## Service login (Maps, Mods, Replays)
 
-FAF's API only answers requests that carry a token; there are no anonymous listings. faf-web gets its token the way faforever.com does, through an OAuth `client_credentials` client of its own (`lib/faftoken.js`).
+FAF's API only answers requests that carry a token; there are no anonymous listings. The server gets its token the way faforever.com does, through an OAuth `client_credentials` client of its own (`lib/faftoken.js`).
 
-1. A FAF admin creates the client (gitops-stack `apps/ory-hydra/values.yaml`, "FAF Web (public)") and gives you its secret.
-2. In Dockhand, set two environment variables on the stack:
-   - `FAF_API_CLIENT_ID`: the client id from values.yaml
-   - `FAF_API_CLIENT_SECRET`: the secret
-3. Redeploy. `GET /healthz` shows `"serviceLogin": true`.
+The client is "FAF Web (public)" in gitops-stack `apps/ory-hydra/values.yaml`. Its secret is kept in Infisical twice: `FAFWEB_M2M_SECRET` in `ory-hydra` (for Hydra) and `FAF_API_CLIENT_SECRET` in `faf-webclient` (for this site). The server reads two environment variables:
+
+- `FAF_API_CLIENT_ID`: the client id
+- `FAF_API_CLIENT_SECRET`: the secret
+
+`GET /healthz` shows `"serviceLogin": true` when both are set.
 
 Without these variables, those three tabs say the login isn't set up, and everything else works. The token never leaves the server: it is only attached to requests to api.faforever.com.
 
@@ -49,7 +50,7 @@ The Chat tab logs players in with their FAF account and connects them to FAF's c
 
 FAF's chat lets one account be connected several times, so the desktop client stays online. Both connections share their channels: closing a channel tab here only hides it, and `/part` leaves it everywhere.
 
-The client has to exist in FAF's Hydra (gitops-stack `apps/ory-hydra/values.yaml`, "FAF Web") with this site's callback among its redirect URIs. Until then, set `FAF_LOGIN_CLIENT_ID=off` in Dockhand and the Chat tab says login isn't available. `GET /healthz` shows `"chatLogin"`.
+The client is "FAF Web" in gitops-stack `apps/ory-hydra/values.yaml`. Its only redirect URI is `https://webclient.$BASE_DOMAIN/auth/callback`, so login works on FAF's own deployments and nowhere else. On a private test server, set `FAF_LOGIN_CLIENT_ID=off` and the Chat tab says login isn't available. `GET /healthz` shows `"chatLogin"`.
 
 ## Layout
 
@@ -59,7 +60,8 @@ The client has to exist in FAF's Hydra (gitops-stack `apps/ory-hydra/values.yaml
 | `webtest.js` | Server tests (`npm test`). No network needed. |
 | `web/` | Website source: React + TypeScript + Vite. |
 | `web/src/ds/` | The Rust client's design system: tokens, fonts, shell and nav styles, icons. |
-| `public/` | The **built** website, committed so the server needs no build step. |
+| `public/` | The **built** website, committed so a git clone runs without a build step. The image builds its own copy from `web/`. |
+| `Dockerfile`, `.github/workflows/image.yml` | The image FAF runs, published on every push to `main`. |
 
 ## Changing the website
 
@@ -71,7 +73,18 @@ npm run build      # type-checks, then writes the site into ../public
 
 Commit `web/` and `public/` together. For live editing, run `node server.js` in the repo root and `npm run dev` in `web/`; the dev server forwards `/api` to it.
 
-## Deploying on Dockhand
+## Releasing
+
+Pushing to `main` is the release, the same setup as FAForever/faf-tournaments:
+
+1. GitHub Actions (`.github/workflows/image.yml`) checks the server, runs `npm test`, builds the website, then builds the image and publishes it as `faforever/faf-webclient:latest` and `:<commit>`.
+2. FAF's cluster (gitops-stack `apps/faf-webclient`) notices the new `latest` within two minutes and rolls it out (Keel).
+
+A failing check publishes nothing, and the running version stays. To roll back, point `latest` at an earlier commit's image.
+
+The cluster sets `FAF_BASE_DOMAIN`, `FAF_API_CLIENT_ID` and `FAF_LOGIN_CLIENT_ID` in `apps/faf-webclient/templates/config.yaml`. `FAF_API_CLIENT_SECRET` comes from the Infisical secret `faf-webclient`.
+
+## A private test server on Dockhand
 
 1. Paste `docker-compose.yml` into a Dockhand stack. It clones this repo and runs `node server.js`. There is no volume. The only secret is the optional service login, set as stack environment variables (see above), never in the file.
 2. Point an Nginx Proxy Manager host at `<host>:8098`, with **Cache Assets OFF**.
@@ -83,4 +96,4 @@ With `AUTO_UPDATE=1`, the site redeploys itself within a minute of a push to `ma
 
 - `web/src/ds/` and `web/public/fonts`, `web/public/assets/faflogo.svg` come from the [FAF Rust client](https://github.com/FAForeverRustClient/FAForeverRustClient) at commit `ed3121e9` (MIT).
 - Geist and Geist Mono fonts: Vercel, SIL Open Font License 1.1.
-- The server and proxy come from the earlier faf-web (MIT).
+- The server and proxy come from the earlier faf-web by Nuggets (MIT).
