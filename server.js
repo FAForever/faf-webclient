@@ -29,7 +29,7 @@ const { createCache, proxyGet } = require('./lib/proxy');
 const { resolveFile, cacheHeader } = require('./lib/static');
 const { createWatcher } = require('./lib/watcher');
 const { createTokenSource } = require('./lib/faftoken');
-const { boardTarget, pageOf } = require('./lib/leaderboard');
+const { boardTarget, pageOf, apiTarget, pageFromApi } = require('./lib/leaderboard');
 
 const PORT = Number(process.env.PORT || 8098);
 // Auto-update. Off unless AUTO_UPDATE=1, so nothing changes for anyone who
@@ -119,30 +119,19 @@ async function handleApi(req, res, url) {
 
   const opts = {};
   if (target.needsServiceLogin) {
-    if (!serviceLogin) {
-      sendJson(res, 503, {
-        error: 'FAF API service login is not configured',
-        code: 'service-login-missing'
-      });
-      return;
-    }
-    try {
-      opts.headers = { Authorization: 'Bearer ' + await serviceLogin.get() };
-    } catch (err) {
-      log('error', 'service login failed', { reason: err.message });
-      sendJson(res, 502, { error: 'FAF API service login failed', code: 'service-login-failed' });
-      return;
-    }
+    const headers = await serviceLoginHeaders(res);
+    if (!headers) return;
+    opts.headers = headers;
   }
 
   const t0 = Date.now();
   const out = await proxyGet(target, cache, opts);
   // A token revoked or expired early: fetch a fresh one on the next request.
   if (target.needsServiceLogin && out.status === 401) serviceLogin.invalidate();
-  log(out.status >= 400 ? 'warn' : 'info', 'proxy', {
+  log(out.status >= 400 ? 'warn' : 'info', 'proxy', Object.assign({
     route: routeName, rest, status: out.status,
     ms: Date.now() - t0, cached: out.cached, bytes: out.body.length
-  });
+  }, out.via || {}));
 
   res.writeHead(out.status, Object.assign({
     'Content-Type': out.contentType,
@@ -153,19 +142,66 @@ async function handleApi(req, res, url) {
   res.end(out.body);
 }
 
-/** /api/leaderboard/<board>?page=N&q=name - one page of a public leaderboard. */
+/**
+ * The Authorization header for FAF's API, or null after answering the request
+ * with the reason there is none.
+ */
+async function serviceLoginHeaders(res) {
+  if (!serviceLogin) {
+    sendJson(res, 503, {
+      error: 'FAF API service login is not configured',
+      code: 'service-login-missing'
+    });
+    return null;
+  }
+  try {
+    return { Authorization: 'Bearer ' + await serviceLogin.get() };
+  } catch (err) {
+    log('error', 'service login failed', { reason: err.message });
+    sendJson(res, 502, { error: 'FAF API service login failed', code: 'service-login-failed' });
+    return null;
+  }
+}
+
+/**
+ * /api/leaderboard/<board>?page=N&q=name - one page of a leaderboard.
+ *
+ * With the service login: straight from FAF's API, one page per request.
+ * Without it: faforever.com's public JSON, paged here. That host is behind
+ * Cloudflare, which can refuse a server (403); that case gets its own code so
+ * the page can say what is going on.
+ */
 async function handleLeaderboard(res, board, url) {
-  const target = boardTarget(board);
+  const options = {
+    page: url.searchParams.get('page'),
+    query: url.searchParams.get('q') || ''
+  };
+  const viaApi = Boolean(serviceLogin);
+  const target = viaApi ? apiTarget(board, options) : boardTarget(board);
   if (!target) {
     sendJson(res, 404, { error: 'unknown endpoint' });
     return;
   }
+  const opts = {};
+  if (viaApi) {
+    const headers = await serviceLoginHeaders(res);
+    if (!headers) return;
+    opts.headers = headers;
+  }
   const t0 = Date.now();
-  const out = await proxyGet(target, cache);
-  log(out.status >= 400 ? 'warn' : 'info', 'proxy', {
-    route: 'leaderboard', rest: board, status: out.status,
+  const out = await proxyGet(target, cache, opts);
+  if (viaApi && out.status === 401) serviceLogin.invalidate();
+  log(out.status >= 400 ? 'warn' : 'info', 'proxy', Object.assign({
+    route: 'leaderboard', rest: board, source: viaApi ? 'api' : 'website', status: out.status,
     ms: Date.now() - t0, cached: out.cached, bytes: out.body.length
-  });
+  }, out.via || {}));
+  if (!viaApi && out.status === 403) {
+    sendJson(res, 502, {
+      error: 'www.faforever.com refused this server\'s request',
+      code: 'leaderboard-refused'
+    });
+    return;
+  }
   if (out.status !== 200) {
     res.writeHead(out.status, Object.assign({
       'Content-Type': out.contentType,
@@ -177,10 +213,7 @@ async function handleLeaderboard(res, board, url) {
   }
   let page;
   try {
-    page = pageOf(out.body, {
-      page: url.searchParams.get('page'),
-      query: url.searchParams.get('q') || ''
-    });
+    page = viaApi ? pageFromApi(out.body, options) : pageOf(out.body, options);
   } catch (err) {
     log('error', 'leaderboard unreadable', { board, reason: err.message });
     sendJson(res, 502, { error: 'leaderboard data was unreadable' });

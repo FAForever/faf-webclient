@@ -120,6 +120,63 @@ function ReplayCard({ doc, game }: { doc: JsonApiDocument; game: JsonApiResource
   );
 }
 
+/**
+ * The replay ID in whatever was typed or pasted: "25001234", "#25001234", or a
+ * replay link. Null until it looks like one.
+ */
+function replayIdFrom(text: string): string | null {
+  const match = text.trim().match(/(?:^|[^0-9])([0-9]{1,10})(?:[^0-9]*)$/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Works without any login: replay.faforever.com/<id> redirects to the API's
+ * replay download, the one API route open to everyone (gitops-stack
+ * apps/faf-content ingress, faf-java-api WebSecurityConfig).
+ */
+function DownloadById() {
+  const [text, setText] = useState("");
+  const id = replayIdFrom(text);
+  const href = id ? `https://replay.faforever.com/${id}` : undefined;
+
+  return (
+    <form
+      className="web-card web-replay-id"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (href) window.location.href = href;
+      }}
+    >
+      <label htmlFor="replay-id">
+        <strong>Download by replay ID</strong>
+        <span className="muted">The number shown on the replay, e.g. 25001234. A replay link works too.</span>
+      </label>
+      <div className="web-replay-id-row">
+        <input
+          id="replay-id"
+          className="web-input"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="Replay ID"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+        />
+        <a
+          className={`web-button web-button-primary${href ? "" : " is-disabled"}`}
+          href={href}
+          aria-disabled={!href}
+          rel="noopener noreferrer"
+          onClick={(event) => {
+            if (!href) event.preventDefault();
+          }}
+        >
+          <Icon name="download" size={15} /> Download
+        </a>
+      </div>
+    </form>
+  );
+}
+
 export function ReplaysView() {
   const [typed, setTyped] = useState("");
   const [player, setPlayer] = useState("");
@@ -150,6 +207,7 @@ export function ReplaysView() {
   return (
     <div className="web-view">
       <ViewHeader title="Replays" description="Recently finished games. Download a replay to watch it in the desktop client." />
+      <DownloadById />
       <label className="web-search">
         <Icon name="search" size={16} />
         <input type="search" placeholder="Player name (exact)" value={typed} onChange={(event) => setTyped(event.target.value)} />

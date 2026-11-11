@@ -70,20 +70,16 @@ export function Loading({ what }: { what: string }) {
   );
 }
 
+// Failures server.js explains with a code, and what to tell the visitor.
+const EXPLAINED: Record<string, string> = {
+  "service-login-missing": "FAF's API only answers logged-in requests, and this site's login to it isn't set up yet.",
+  "service-login-failed": "This site's login to FAF's API was refused. Try again later.",
+  "leaderboard-refused": "faforever.com refused this site's request. This tab will work once the site's login to FAF's API is set up.",
+};
+
 export function LoadFailed({ icon, what, status, code }: { icon: IconName; what: string; status: number | null; code?: string | null }) {
-  if (code === "service-login-missing" || code === "service-login-failed") {
-    return (
-      <EmptyState
-        icon={icon}
-        title={`Can't show ${what} yet`}
-        hint={
-          code === "service-login-missing"
-            ? "FAF's API only answers logged-in requests, and this site's login to it isn't set up yet."
-            : "This site's login to FAF's API was refused. Try again later."
-        }
-        bordered
-      />
-    );
+  if (code && EXPLAINED[code]) {
+    return <EmptyState icon={icon} title={`Can't show ${what} yet`} hint={EXPLAINED[code]} bordered />;
   }
   return (
     <EmptyState

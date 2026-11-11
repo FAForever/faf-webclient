@@ -22,7 +22,7 @@ const { createCache, proxyGet, UPSTREAM_HEADERS } = require('./lib/proxy');
 const { resolveFile } = require('./lib/static');
 const { createWatcher, redactUrl } = require('./lib/watcher');
 const { createTokenSource } = require('./lib/faftoken');
-const { boardTarget, pageOf, PAGE_SIZE } = require('./lib/leaderboard');
+const { boardTarget, pageOf, apiTarget, pageFromApi, PAGE_SIZE } = require('./lib/leaderboard');
 
 let pass = 0, fail = 0;
 const failures = [];
@@ -153,6 +153,31 @@ function testLeaderboard() {
   eq(found.total, 1, 'leaderboard: search is case-insensitive');
   eq(found.rows[0].rank, 78, 'leaderboard: search keeps the real rank');
   eq(pageOf(body, { query: 'nobody' }).total, 0, 'leaderboard: no match is an empty page');
+
+  // The API path, used when the service login is configured.
+  const now = Date.UTC(2026, 10, 11, 15, 30);
+  const t = apiTarget('3v3', { page: '2', query: 'nu"gg*', now });
+  const u = t && new URL(t.url);
+  ok(u && u.origin + u.pathname === 'https://api.faforever.com/data/leaderboardRating', 'leaderboard api: hits leaderboardRating', t && t.url);
+  eq(u && u.searchParams.get('filter'),
+    'leaderboard.id==6;updateTime=ge=2025-11-11T00:00:00.000Z;player.login=="*nugg*"',
+    'leaderboard api: faforever.com\'s board id, a day-rounded 12-month window, a sanitised search');
+  eq(u && u.searchParams.get('page[number]'), '2', 'leaderboard api: asks for the requested page');
+  eq(apiTarget('global', { now: now + 3600_000 }).url, apiTarget('global', { now }).url, 'leaderboard api: the URL is stable within a day, so it caches');
+  eq(apiTarget('5v5', { now }), null, 'leaderboard api: unknown boards are refused');
+
+  const apiBody = Buffer.from(JSON.stringify({
+    data: [
+      { id: '10', type: 'leaderboardRating', attributes: { rating: 1999.6, totalGames: 40, wonGames: 30 }, relationships: { player: { data: { id: '7', type: 'player' } } } },
+      { id: '11', type: 'leaderboardRating', attributes: { rating: 1900.2, totalGames: 10, wonGames: 2 }, relationships: { player: { data: { id: '8', type: 'player' } } } }
+    ],
+    included: [{ id: '7', type: 'player', attributes: { login: 'Nuggets' } }, { id: '8', type: 'player', attributes: { login: 'Deli' } }],
+    meta: { page: { totalRecords: 1234, totalPages: 25 } }
+  }));
+  const ap = pageFromApi(apiBody, { page: 3 });
+  eq(ap.total + '/' + ap.pages, '1234/25', 'leaderboard api: totals come from the page meta');
+  eq(ap.rows[0].rank + ' ' + ap.rows[0].name + ' ' + ap.rows[0].rating, (2 * PAGE_SIZE + 1) + ' Nuggets 2000', 'leaderboard api: rank follows the page, names resolve, rating rounds');
+  eq(pageFromApi(apiBody, { page: 1, query: 'nug' }).rows[0].rank, null, 'leaderboard api: a search result has no known rank');
 }
 
 /* ------------------------------------------------ static paths (security) */

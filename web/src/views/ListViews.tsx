@@ -19,6 +19,25 @@ function teamSize(value: unknown): string | null {
   return Number.isFinite(n) && n > 0 ? `${n}v${n}` : null;
 }
 
+/** The tournament site sends the headline prize as { currency, amount } (faf-tournaments server.js). */
+function prizeText(value: unknown): string | null {
+  if (typeof value === "string") return value || null;
+  if (!value || typeof value !== "object") return null;
+  const { amount, currency } = value as { amount?: unknown; currency?: unknown };
+  if (amount == null || amount === "") return null;
+  return [String(amount), typeof currency === "string" ? currency : null].filter(Boolean).join(" ");
+}
+
+/** "8 teams" for team tournaments, "12 players" for 1v1 and FFA. */
+function entrants(t: Row): string | null {
+  const size = Number(pick(t, "teamSize"));
+  const teams = Number(pick(t, "teams"));
+  const players = Number(pick(t, "players"));
+  if (size > 1 && teams > 0) return `${teams} ${teams === 1 ? "team" : "teams"}`;
+  if (players > 0) return `${players} ${players === 1 ? "player" : "players"}`;
+  return null;
+}
+
 function ratingLimit(t: Row): string | null {
   const min = pick<number>(t, "minRating");
   const max = pick<number>(t, "maxRating");
@@ -52,9 +71,13 @@ export function TournamentsView() {
           <div className="web-list">
             {sorted.map((t, i) => {
               const id = pick<string | number>(t, "id");
-              const status = TOURNEY_STATUS[String(pick(t, "status"))] ?? { label: String(pick(t, "status") ?? "Unknown"), tone: "" };
+              const status = pick(t, "abandoned")
+                ? { label: "Abandoned", tone: "" }
+                : TOURNEY_STATUS[String(pick(t, "status"))] ?? { label: String(pick(t, "status") ?? "Unknown"), tone: "" };
+              const prize = prizeText(pick(t, "prize"));
               const details = [
                 teamSize(pick(t, "teamSize")),
+                entrants(t),
                 ratingLimit(t),
                 pick(t, "eventDate") ? formatDate(pick(t, "eventDate")) : null,
               ].filter(Boolean);
@@ -63,7 +86,7 @@ export function TournamentsView() {
                   <div>
                     <h2 className="web-card-title">{pick<string>(t, "name") ?? "-"}</h2>
                     {details.length > 0 && <p className="muted">{details.join(" · ")}</p>}
-                    {pick<string>(t, "prize") && <p className="muted">Prize: {pick<string>(t, "prize")}</p>}
+                    {prize && <p className="muted">Prize: {prize}</p>}
                   </div>
                   <div className="web-row-end">
                     <span className={`web-chip ${status.tone}`}>{status.label}</span>

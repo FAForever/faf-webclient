@@ -104,6 +104,56 @@ body {
   flex: 1 1 220px;
 }
 
+.web-replay-id {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  max-width: 560px;
+}
+
+.web-replay-id label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.web-replay-id label .muted {
+  font-size: 0.85rem;
+}
+
+.web-replay-id-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.web-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg, var(--color-surface-raised));
+  color: var(--color-text);
+  font: inherit;
+}
+
+.web-input:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+.web-button-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.web-button.is-disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .web-link-card {
   justify-content: flex-start;
   color: var(--color-text);

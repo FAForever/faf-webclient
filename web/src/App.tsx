@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Icon, type IconName } from "./ds/Icon";
+import { ErrorBoundary } from "./views/ErrorBoundary";
 import { EmbedView, EventsView, LinksView, TournamentsView } from "./views/ListViews";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { PlayView } from "./views/PlayView";
@@ -128,7 +129,10 @@ export function App() {
       <main className="workspace">
         <section ref={contentRef} className={`content content-tab-${active.id}`} aria-label={active.label} tabIndex={-1}>
           <div className={`content-inner content-${active.id}`}>
-            <Active key={active.id} />
+            {/* Keyed by tab, so switching tabs also clears a crashed one. */}
+            <ErrorBoundary key={active.id}>
+              <Active />
+            </ErrorBoundary>
           </div>
         </section>
       </main>

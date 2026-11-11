@@ -7,8 +7,8 @@ Tabs: News, Play (open lobbies), Replays, Maps, Mods, Leaderboard, Tournaments, 
 ## How it works
 
 ```
-browser  ──►  faf-web (server.js)  ──►  api.faforever.com            maps, mods, replays (service login)
-                                    ──►  www.faforever.com           leaderboards (public JSON)
+browser  ──►  faf-web (server.js)  ──►  api.faforever.com            maps, mods, replays, leaderboards (service login)
+                                    ──►  www.faforever.com           leaderboards without the login (public JSON)
                                     ──►  lobby.faforever.com/games    open lobbies
                                     ──►  tournaments.faforever.com    tournaments
                                     ──►  raw.githubusercontent.com   events calendar
@@ -21,7 +21,8 @@ News, Changelog and Units are FAF's own pages, shown in a frame.
 - Every visitor shares one cached copy of each response, so FAF's servers see one client, not one per visitor.
 - The proxy never forwards a visitor's cookies or credentials, and only allows GET.
 - Open lobbies come from the lobby server's public `GET /games` endpoint. Until that endpoint is live, the Play tab says so.
-- Leaderboards come from faforever.com's public JSON (`/leaderboards/<board>.json`). The server pages and searches it, so a phone loads 50 rows, not the whole board.
+- Leaderboards come from FAF's API when the service login is set up, otherwise from faforever.com's public JSON (`/leaderboards/<board>.json`), which the server pages and searches. faforever.com is behind Cloudflare and may refuse a server's request; the log line then shows `"server":"cloudflare"`, and the tab says so.
+- Replays can be downloaded by ID with no login at all: `replay.faforever.com/<id>` redirects to the API's public replay download.
 - Replay downloads link straight to `replay.faforever.com/<id>`, which needs no login.
 
 ## Service login (Maps, Mods, Replays)

@@ -17,7 +17,8 @@ interface LeaderboardPage {
   total: number;
   page: number;
   pages: number;
-  rows: { rank: number; playerId: number; name: string; rating: number | null; games: number | null; won: number | null }[];
+  // rank is null for a search result when the page came from FAF's API.
+  rows: { rank: number | null; playerId: number | null; name: string; rating: number | null; games: number | null; won: number | null }[];
 }
 
 function winRate(won: number | null, games: number | null): string {
@@ -87,9 +88,9 @@ export function LeaderboardView() {
                 </tr>
               </thead>
               <tbody>
-                {load.data.rows.map((row) => (
-                  <tr key={row.playerId}>
-                    <td className="num muted">{row.rank}</td>
+                {load.data.rows.map((row, index) => (
+                  <tr key={row.playerId ?? `row-${index}`}>
+                    <td className="num muted">{row.rank ?? "-"}</td>
                     <td>{row.name}</td>
                     <td className="num">{row.rating ?? "-"}</td>
                     <td className="num muted">{row.games ?? "-"}</td>
