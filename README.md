@@ -1,255 +1,54 @@
 # faf-web
 
-A mobile web companion for Forged Alliance Forever. News, tournaments, events,
-leaderboard, maps, mods, unit database, training links, changelog.
+A view-only FAF website in the design of the FAF Rust client, usable on phones.
 
-**There is no Play tab, on purpose.** Joining and hosting games needs the
-`unique_id` machine proof, which a browser cannot produce and which a shared
-relay would present identically for every player. That question is unresolved
-with FAF, so the lobby is simply not part of this build. The long-term fix is a
-server-side change on FAF's side so lobby information is available through an
-API this client can read, at which point the Play tab comes back without needing
-a machine proof at all.
+Tabs: Play (open lobbies), News, Maps, Mods, Leaderboard, Tournaments, Events, Changelog, Units, Links.
 
-Nothing else here depends on it, which is why everything else can ship now.
-
-Zero runtime dependencies, no build step, no database, no secrets. Upload the
-files, restart the container.
-
----
-
-## What it is, in one diagram
+## How it works
 
 ```
-browser  ──►  faf-web  ──►  api.faforever.com          (maps, mods, leaderboard)
-                        ──►  tournaments.doodlepros.com (tournaments)
-                        ──►  raw.githubusercontent.com  (events calendar)
-         └─ same origin ─┘
+browser  ──►  faf-web (server.js)  ──►  api.faforever.com            maps, mods, leaderboard
+                                    ──►  lobby.faforever.com/games    open lobbies
+                                    ──►  tournaments.doodlepros.com   tournaments
+                                    ──►  raw.githubusercontent.com   events calendar
 ```
 
-Everything the browser fetches comes from this origin. The service proxies
-onward. That is the central design decision and it buys three things:
+- The website runs entirely in the visitor's browser.
+- `server.js` serves the built site from `public/` and proxies a fixed allowlist of read-only upstreams (`lib/upstreams.js`).
+- Every visitor shares one cached copy of each response, so FAF's servers see one client, not one per visitor.
+- The proxy forwards no credentials and only allows GET.
+- Open lobbies come from the lobby server's public `GET /games` endpoint. Until that endpoint is live, the Play tab says so.
 
-1. **CORS stops mattering.** It does not matter whether `api.faforever.com`
-   allows browser origins, because no browser ever calls it directly. This was
-   not a preference: it could not be verified either way from the build
-   environment, and designing around the unknown was cheaper than gambling.
-2. **`tournaments.doodlepros.com` needs no changes.** Calling it from a browser
-   directly would have meant adding CORS headers there, a change to a second
-   codebase. Proxying avoids it entirely.
-3. **One origin means one CSP**, one TLS certificate, and no preflight requests.
+## Layout
 
-The cost is that the service has to be up for the app to work. For a companion
-app that is an acceptable trade; it is up anyway to serve the page.
+| Path | What |
+|---|---|
+| `server.js`, `lib/` | Server: static files, the proxy, auto-update. No runtime dependencies. |
+| `webtest.js` | Server tests (`npm test`). No network needed. |
+| `web/` | Website source: React + TypeScript + Vite. |
+| `web/src/ds/` | The Rust client's design system: tokens, fonts, shell and nav styles, icons. |
+| `public/` | The **built** website, committed so the server needs no build step. |
 
----
+## Changing the website
 
-## The proxy, and why it is not an open relay
+```
+cd web
+npm install
+npm run build      # type-checks, then writes the site into ../public
+```
 
-`lib/upstreams.js` is the entire security model and is worth reading before
-changing anything.
-
-**The browser never sends a URL.** It sends a route name (`faf`, `tourney`,
-`events`) plus a path, both of which must appear in an allowlist, and the real
-URL is rebuilt on this side. A proxy that forwards wherever the caller points it
-is an open relay: someone finds it, and your host starts fetching things on
-strangers' behalf, from your IP.
-
-Also enforced:
-
-- **GET only.** Nothing here can change anything upstream.
-- **No credentials forwarded, ever.** The outgoing header set is exactly
-  `User-Agent` and `Accept`, as a frozen constant the suite asserts against.
-  Browser cookies and `Authorization` headers are dropped, so this cannot be
-  tricked into acting as a logged-in user.
-- **Resource allowlist** per upstream. Adding a tab means adding its resource.
-- **Blocked and unknown answer identically**, so the allowlist cannot be probed.
-- **Caps**: 8 MB per response, 15 s timeout, bounded cache of 500 entries.
-- **Upstream HTML error pages are not forwarded.** JSON errors are, because they
-  are small and say something useful.
-
-Endpoints were read out of the FAF desktop client
-(`FAForeverRustClient/crates/faf-app/src/infra/*.rs`), not guessed.
-
----
-
-## Tabs, and what each one actually does
-
-| Tab | Source | Notes |
-|---|---|---|
-| News | `www.faforever.com/newshub` | embedded, with a direct link if framing is refused |
-| Tournaments | `tournaments.doodlepros.com/api/tournaments` | returns a bare array, not a wrapped object |
-| Events | community calendar JSON on GitHub | verified to allow browser origins anyway |
-| Leaderboard | `/data/leaderboardRating`, global, top 50 | resolves the `player` relationship from `included` |
-| Maps | `/data/map` + `latestVersion` | browse only; a browser cannot install to the game folder |
-| Mods | `/data/mod` + `latestVersion` | same |
-| Unit DB | `faforever.github.io/etfreeman-db` | embedded |
-| Changelog | `faforever.github.io/fa/changelog` | embedded |
-| Training | wiki and forum links | honest placeholder, see below |
-| Chat | nothing yet | needs login, see below |
-
-**Chat** is not stubbed out of laziness. FAF chat is IRC reachable over
-`wss://chat.faforever.com`, so a browser can connect with no extra server. What
-is missing is authentication: FAF's OAuth is a PKCE public-client flow the
-browser could run unchanged, but the desktop client redirects to
-`http://127.0.0.1:<port>`, which a browser cannot use. **FAF has to register a
-web redirect URI** before login, and therefore chat, can work. That is a request
-to FAF, not code.
-
-When it is wired up, note that IRC nicknames are unique per connection. Unless
-FAF's IRC server has multi-client mode enabled, being in chat here may collide
-with being in chat on the desktop client.
-
-**Training** is a link list. The desktop tab is built on a guides repository,
-recorded build orders and replay analysis, none of which has a web equivalent
-yet. Rather than fake it, the tab says so.
-
----
-
-## Known unverified: the API field names
-
-The build environment had no route to `api.faforever.com` (the egress proxy
-refuses it), so **the exact JSON:API attribute names could not be checked against
-the live API.** They were taken from the desktop client's Rust source, which is
-good evidence but not proof.
-
-Every field read goes through a `pick()` helper with fallbacks, and a missing
-field renders as a dash rather than `undefined`. So a wrong guess degrades to a
-blank column instead of a broken page.
-
-**The first real load is the test.** If a column is empty, the fix is one line in
-`public/app.js` - add the correct attribute name to the relevant `pick()` call.
-The likely candidates are rating (`rating` vs `meanRating`), player name (`login`
-vs `displayName`) and map thumbnails (`thumbnailUrlSmall` vs `thumbnailUrl`).
-
----
+Commit `web/` and `public/` together. For live editing, run `node server.js` in the repo root and `npm run dev` in `web/`; the dev server forwards `/api` to it.
 
 ## Deploying on Dockhand
 
-Same pattern as the tournament site and uid-relay: no image build, the container
-clones the repo at start.
+1. Paste `docker-compose.yml` into a Dockhand stack. It clones this repo and runs `node server.js`. There are no secrets and no volume.
+2. Point an Nginx Proxy Manager host at `<host>:8098`, with **Cache Assets OFF**.
+3. Check the log for `listening`. `GET /healthz` reports the state.
 
-1. Create the repo and upload these files. `lib/` and `public/` must land as
-   folders.
-2. Paste `docker-compose.yml` into a Dockhand stack.
-3. Start it. There are **no secrets and no volume** - nothing to configure,
-   nothing to persist, and recreating the stack loses nothing.
-4. Point an Nginx Proxy Manager host at `<host>:8098`.
-   **Cache Assets OFF**, as on the tourney host.
-5. Check the log for `listening`.
+With `AUTO_UPDATE=1`, the site redeploys itself within a minute of a push to `main`. A new revision is cloned, syntax-checked and tested first. A failing one is logged as `UPDATE REJECTED`, and the old version keeps serving. The container's `restart: unless-stopped` is what restarts it, so keep that policy.
 
-Port **8098**. uid-relay is 8097 and the tourney site is 8090.
+## Credits and licences
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `PORT` | `8098` | HTTP port. |
-| `AUTO_UPDATE` | off | `1` enables the git watcher below. |
-| `UPDATE_BRANCH` | `main` | Branch to follow. Must match the clone in the compose command. |
-| `UPDATE_INTERVAL_MS` | `60000` | Poll interval, floored at 30000. |
-
-No secrets, no volume, no database.
-
----
-
-## Auto-update
-
-With `AUTO_UPDATE=1` the site redeploys itself when the branch moves, so someone
-with **only GitHub access** can update it without touching Dockhand.
-
-**How the restart works**, because it looks like a trick: the container's command
-clones the repo and then runs the server, and `restart: unless-stopped` makes
-Docker restart the container on **any** exit, including exit 0. So deploying is
-just exiting. No docker socket, no privileged access, no inbound endpoint.
-
-That restart policy is load-bearing. Change it to `on-failure` and auto-update
-stops working silently.
-
-**Why polling, not a webhook.** A webhook is instant but needs a public endpoint,
-a shared secret, an NPM route and signature verification. One `git ls-remote` a
-minute needs none of that and works identically for a private repo, because it
-reuses the credentials already in the clone URL. A minute of delay is not worth
-four moving parts.
-
-**A bad commit cannot take the site down.** This is the point of the feature, not
-a nicety: handing someone GitHub access is exactly the situation where a broken
-commit reaches production unattended. So a detected change is never deployed
-blindly. The new revision is cloned to a temp directory, every source file is
-syntax-checked, and the full test suite is run. Only then does the process exit.
-A failure is logged as `UPDATE REJECTED` and the old version keeps serving.
-
-A rejected revision is judged **once**, not re-tested every minute. Pushing a
-newer commit gives it a fresh attempt.
-
-`GET /healthz` reports the watcher's state: current sha, branch, interval and
-what happened last.
-
-### What this means for whoever is given access
-
-They edit files on GitHub, and within a minute the site either updates or logs a
-rejection. They cannot deploy something that fails the tests, and they cannot
-lose data because there is none. What they **can** do is change what the site
-shows, so it is still write access to a public site - give it to people you would
-give the Dockhand password to.
-
-To turn it off, set `AUTO_UPDATE: "0"` and restart.
-
-### Headers it sets
-
-`Content-Security-Policy` limits scripts to this origin, images to this origin
-plus `content.faforever.com`, and framing to the three FAF pages that are
-embedded. `X-Content-Type-Options: nosniff` and a strict referrer policy are set
-on every response. The app shell is served `no-cache` so an update reaches people
-on the next load rather than whenever their browser feels like it.
-
----
-
-## Testing
-
-```bash
-npm run check   # node --check every source file
-npm test        # 78 checks, no network required
-```
-
-`webtest.js` unit-tests the pieces that carry real risk - the upstream
-allowlist, the static path resolver and the auto-update watcher - then boots the
-real server over real HTTP for routing, the SPA fallback, method handling and
-security headers. The
-proxy's upstream fetch is injectable, so timeouts, oversized bodies, 500s and
-header hygiene are all driven with stubs rather than by hoping FAF answers.
-
-**The suite was plant-validated against six real bugs.** Five were caught
-immediately. The sixth, forwarding an `Authorization` header upstream, was
-**not**, because the assertion inspected the stub's arguments rather than the
-real header set. That was a false pass proving nothing, so the outgoing headers
-were extracted into a frozen constant and the test now asserts against the actual
-object. Re-planting the same bug now fails two checks.
-
-### Browser check
-
-```bash
-npm i --no-save playwright-core
-node browsercheck.js
-```
-
-Renders the app in real Chromium with fixture data, drives all eleven routes,
-exercises in-app navigation, the back button, the mobile menu and Escape,
-asserts there is no horizontal overflow at 390px, fails on any console or page
-error, and writes `screenshot-mobile.png` and `screenshot-desktop.png`.
-
-Asserting an element exists is not asserting it works, which is why this exists
-alongside the unit suite.
-
----
-
-## What is not here yet
-
-- **The Play tab.** Waiting on FAF exposing lobby information through an API.
-- **Login.** Waiting on FAF registering a web OAuth redirect URI. Until then
-  every tab shows public data and nothing needs a session.
-- **Chat**, which depends on login.
-- **Real training content**, which depends on the client team deciding what the
-  web version should contain.
-- **Replays, clans, player cards.** The desktop client has them; nobody has
-  asked for them here yet.
-
-None of these are blocked by anything in this repo.
+- `web/src/ds/` and `web/public/fonts`, `web/public/assets/faflogo.svg` come from the [FAF Rust client](https://github.com/FAForeverRustClient/FAForeverRustClient) at commit `ed3121e9` (MIT).
+- Geist and Geist Mono fonts: Vercel, SIL Open Font License 1.1.
+- The server and proxy come from the earlier faf-web (MIT).

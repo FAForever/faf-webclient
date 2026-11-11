@@ -1,0 +1,93 @@
+/* A line of state above a list: icon, sentence, and the way out on the right.
+   Errors carry the error colour on the icon and a faint wash, never the text
+   alone, and an icon of their own so the colour is not the only signal. */
+/* Room above and below of its own: the notice sits between a search panel
+   and a results line that carry no margin on that side, and with none here it
+   touched the "N on this page" line under it. Vertical margins collapse
+   between two notices in a row, so a stack is spaced once, not twice. */
+.status-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-height: 40px;
+  margin: var(--space-3) 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+
+/* Containers that already space their children with a gap: there a margin
+   would add to it rather than collapse into it. */
+:is(.events-view, .events-main, .game-detail-footer, .tournament-chat-room-body) > .status-notice {
+  margin: 0;
+}
+
+.status-notice > svg {
+  flex: none;
+}
+
+.status-notice-text {
+  flex: 1 1 240px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.status-notice-actions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* A line's own button, not a toolbar's: 28 px in a 40 px line leaves the
+   same air above and below it as the text has. */
+.status-notice-actions > button {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.status-notice.is-error {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-error) 8%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-error) 40%, var(--color-border));
+}
+
+.status-notice.is-error > svg {
+  color: var(--color-error-text);
+}
+
+/* The arrows turn while something is on its way, which is seconds at most;
+   still for anyone who asked for less motion. Transform only. */
+.status-notice.is-busy > svg {
+  animation: status-notice-spin 1.2s linear infinite;
+}
+
+@keyframes status-notice-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-notice.is-busy > svg {
+    animation: none;
+  }
+}
+
+:root[data-reduced-motion="true"] .status-notice.is-busy > svg {
+  animation: none;
+}
+
+/* Results that belong to the previous search, while the next one is on its
+   way: still readable, visibly not the answer. */
+.is-stale-results {
+  opacity: 0.5;
+  transition: opacity 150ms ease-out;
+}

@@ -1,0 +1,644 @@
+.app-shell {
+  --sidebar-width: 224px;
+  display: grid;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 24px;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden !important;
+  background: var(--color-sidebar);
+}
+
+.status-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-muted);
+  transition: background 150ms ease;
+}
+
+.status-bar[data-status="connecting"] .status-dot {
+  background: var(--color-warn);
+}
+
+.status-bar[data-status="connected"] .status-dot {
+  background: var(--color-ok);
+}
+
+.status-label {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.status-version {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.sidebar {
+  position: relative;
+  z-index: 2;
+  grid-column: 1;
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 10px 0;
+  background: var(--color-sidebar);
+  border-right: 1px solid var(--color-border);
+}
+
+.sidebar-resizer {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  right: -6px;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+  user-select: none;
+}
+
+.sidebar-resizer::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 5px;
+  width: 1px;
+  background: transparent;
+  content: "";
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+.app-shell.is-resizing-sidebar .sidebar-resizer::after {
+  background: var(--color-border-strong);
+}
+
+.sidebar-resizer:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.app-shell.is-resizing-sidebar,
+.app-shell.is-resizing-sidebar * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.brand {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 60px;
+  padding: 0 8px;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+}
+
+
+.brand-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.brand-copy strong {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand-copy small {
+  margin-top: 2px;
+  color: var(--color-subtle);
+  font-size: 11px;
+}
+
+.workspace {
+  grid-column: 2;
+  grid-row: 1;
+  display: grid;
+  /* Row 1 holds the banner stack, which is usually empty; it then collapses
+     to zero. `.content` is pinned to row 2 either way, so its `minmax(0, 1fr)`
+     sizing (which every full-height tab depends on) never shifts rows. */
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.workspace > .content {
+  grid-row: 2;
+}
+
+/* Every banner shares one grid row and stacks inside it, so two at once do
+   not overlap and neither one has to know about the other. */
+.workspace-banners {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Missing-install banner; see InstallBanner.tsx. */
+.install-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 28px;
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-border-strong);
+  /* Status colour, used for status: the client can't do what it's for. */
+  box-shadow: inset 3px 0 0 var(--color-warn);
+  animation: install-banner-in 220ms ease-out;
+}
+
+@keyframes install-banner-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install-banner {
+    animation: none;
+  }
+}
+
+.install-banner-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-warn-text);
+}
+
+.install-banner-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.install-banner-copy strong {
+  font-size: 13px;
+}
+
+.install-banner-copy .muted {
+  font-size: 12px;
+}
+
+.install-banner-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.install-banner-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-subtle);
+  cursor: pointer;
+}
+
+.install-banner-close:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.install-banner-close:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.player-name {
+  overflow: hidden;
+  color: var(--color-text);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.profile-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-subtle);
+  font-size: 11px;
+}
+
+/* Green only when the lobby is actually connected: green means online and
+   nothing else. Connecting and offline keep a neutral dot; the word beside it
+   says which. */
+.profile-status i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--color-subtle);
+  border-radius: 999px;
+}
+
+.profile-status.is-online i {
+  background: var(--color-ok);
+}
+
+.content {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  /* The scrollbar's room is kept whether it shows or not. Without it a tab
+     that grew taller than the window lost 11 px of width at that moment, and
+     everything on it moved left. The same holds for every scrolling area
+     that holds content; `scripts/check-architecture.mjs` asks each one to
+     keep the room or to say why not. */
+  scrollbar-gutter: stable;
+  /* How much of that room the page's padding gives back (`.content-inner`):
+     all of it where the page scrolls, none where it does not keep any. */
+  --content-gutter: var(--scrollbar-size);
+  overflow-x: hidden;
+}
+
+/* These tabs do not scroll as a page: their panels scroll themselves and keep
+   their own room. A kept gutter applies to a clipping box too, and here it
+   would only be an empty strip down the right of the tab. */
+.content.content-tab-news,
+.content.content-tab-units,
+.content.content-tab-chat,
+.content.content-tab-play,
+.content.content-tab-leaderboard,
+.content.content-tab-changelog,
+.content.content-tab-settings,
+.content.content-tab-training,
+.content.content-tab-tournaments {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+  --content-gutter: 0px;
+}
+
+/* Focused from code after a click in the sidebar, so the keys that follow
+   scroll the page that opened (`TabBarProps.onPointerSelect`). It is the page,
+   not a control, and draws no ring of its own. */
+.content:focus {
+  outline: none;
+}
+
+.content-inner {
+  min-width: 0;
+  min-height: 100%;
+  padding: 28px 28px 18px;
+  padding-right: max(0px, 28px - var(--content-gutter, 0px));
+  box-sizing: border-box;
+}
+
+.content-inner.content-chat,
+.content-inner.content-play,
+.content-inner.content-leaderboard,
+.content-inner.content-changelog,
+.content-inner.content-settings,
+.content-inner.content-training,
+.content-inner.content-tournaments {
+  height: 100%;
+  overflow: hidden;
+}
+
+.content-inner.content-news,
+.content-inner.content-units {
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Stays put however short the window is: the navigation above scrolls instead.
+   Without the shrink guard a short window took the height out of the account
+   button, which is the one control that has to remain reachable. */
+.sidebar-footer {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 7px 4px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sidebar-profile-button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 3px 4px;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-profile-button .profile-avatar.has-image {
+  width: 40px;
+  height: 20px;
+}
+
+.sidebar-profile-button .profile-avatar.has-image img {
+  width: 40px;
+  height: 20px;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+.sidebar-profile-button:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border);
+}
+
+.sidebar-profile-button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.sidebar-profile-button:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.command-error-banner {
+  position: fixed;
+  z-index: 110;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: min(460px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+}
+
+.command-error-banner > div {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+
+.command-error-banner span {
+  overflow-wrap: anywhere;
+  color: var(--color-muted);
+}
+
+/* The rail: the sidebar dragged narrow enough that the labels no longer fit.
+   The client already had this layout, but only as a response to a narrow
+   *window*. The request was to be able to shrink the panel itself, and a panel
+   that stops at 176 px of mostly empty space is not shrunk. Below the
+   threshold in `AppShell` the same rules apply, driven by a class instead of a
+   media query, so the two ways of getting here look identical. */
+.app-shell.is-sidebar-rail .sidebar {
+  padding-inline: 8px;
+}
+
+.app-shell.is-sidebar-rail .brand {
+  justify-content: center;
+  padding: 0;
+}
+
+.app-shell.is-sidebar-rail .brand-copy,
+.app-shell.is-sidebar-rail .profile-copy {
+  display: none;
+}
+
+.app-shell.is-sidebar-rail .sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-inline: 0;
+}
+
+/* With the name hidden the button holds the avatar alone: one column,
+   centred, and no side padding. The padding left 30 px at the narrowest rail
+   for a 40 px picture, which then ran from the left edge out to the right,
+   off the line the icons above it are centred on. */
+.app-shell.is-sidebar-rail .sidebar-profile-button {
+  grid-template-columns: auto;
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.app-shell.is-sidebar-rail .tab span {
+  display: none;
+}
+
+.app-shell.is-sidebar-rail .tab {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+/* Game folders is the one entry with a caret after its label. With the label
+   gone, the caret's auto margin pushed it to the far edge and pulled the
+   folder icon off the column every other entry is centred on. */
+.app-shell.is-sidebar-rail .game-folders-caret {
+  display: none;
+}
+
+@media (max-width: 900px) {
+.app-shell {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    padding-inline: 8px;
+  }
+
+  .sidebar-resizer {
+    display: none;
+  }
+
+  .brand {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .brand-copy,
+  .profile-copy {
+    display: none;
+  }
+
+  .sidebar-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .sidebar-footer .profile-avatar {
+    display: none;
+  }
+
+  .content-inner {
+    padding: 22px;
+    padding-right: max(0px, 22px - var(--content-gutter, 0px));
+  }
+
+  /* Stacked, so the tab is taller than the window and the window is what has
+     to scroll. The inner was already released to its content height here; the
+     container it sits in was not, and `.content` is `overflow: hidden` on this
+     tab because the wide layout scrolls its own panels. So the tab grew, the
+     container clipped it, and there was nothing anywhere to scroll: which is
+     the report, and it is a width rule rather than a height one, because
+     narrowing the window is what stacks the panels in the first place. */
+  .content.content-tab-play {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    --content-gutter: var(--scrollbar-size);
+  }
+
+  .content-inner.content-play {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+/* A short window, not a narrow one.
+   The Play tab is laid out to fill the height exactly: `.content` does not
+   scroll and every panel inside it owns its own scrolling. That works until
+   the window is shorter than the panels' own minimums, at which point the
+   bottom of the tab is simply cut off with nothing to scroll, which is what
+   the resize videos on the report show. The narrow case already had this
+   fallback; the short case had none. */
+@media (max-height: 700px) {
+  .content.content-tab-play {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    --content-gutter: var(--scrollbar-size);
+    /* Its height, for the custom games layout to keep the window's
+       (`custom-games.css`, issue 674). */
+    container-type: size;
+  }
+
+  .content-inner.content-play {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 700px) {
+  /* Same pair as the Play tab above, and it was missing the same half. */
+  .content.content-tab-leaderboard {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    --content-gutter: var(--scrollbar-size);
+  }
+
+  .content-inner.content-leaderboard {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+@media (max-width: 900px) {
+  /* The same pair for Tournaments, at the width its list and event stack:
+     stacked, the tab is taller than the window and the window scrolls. */
+  .content.content-tab-tournaments {
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+    --content-gutter: var(--scrollbar-size);
+  }
+
+  .content-inner.content-tournaments {
+    height: auto;
+    overflow: visible;
+  }
+}
+
+/* The player's own picture behind the tabs (issue 439), under a veil of the
+   theme's background so text stays readable: `--app-background-dim` is how
+   much of the veil there is. Set on the document root by `useAppBackground`.
+   Panels and cards keep their own surfaces and sit on top of it. */
+html[data-background="custom"] .workspace {
+  background-color: var(--color-bg);
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--color-bg) var(--app-background-dim, 60%), transparent),
+      color-mix(in srgb, var(--color-bg) var(--app-background-dim, 60%), transparent)
+    ),
+    var(--app-background-image);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+/* The panels that fill the Play tab let the picture through (issue 439). The
+   game list is one panel the size of the tab, and with the theme's opaque
+   surface it covered the picture whole. In tile view its tiles are cards of
+   their own, so the panel around them has no fill and no frame, and the tiles
+   sit on the picture the way the replay vault's cards sit on the tab. In list
+   view the rows are text on the panel itself, and the detail panel is text
+   too, so those keep a blurred veil of their surface: the picture shows
+   through, the writing stays on something even. */
+html[data-background="custom"] :is(.game-browser-panel, .coop-games-main).game-browser-tiles {
+  background: transparent;
+  border-color: transparent;
+}
+
+html[data-background="custom"] :is(.game-browser-panel, .coop-games-main).game-browser-list,
+html[data-background="custom"] :is(.game-detail-panel, .coop-detail) {
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+/* With the tiles on the picture, the count under them would be muted text on
+   whatever the picture is there. It keeps a strip of the veil. */
+html[data-background="custom"] :is(.game-browser-panel, .coop-games-main).game-browser-tiles > .game-browser-footer {
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  backdrop-filter: blur(8px);
+}

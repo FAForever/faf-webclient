@@ -43,6 +43,11 @@ function testUpstreams() {
   ok(good && good.url === 'https://api.faforever.com/data/map?page%5Bsize%5D=5',
     'upstream: the URL is rebuilt on our side, query preserved', good && good.url);
 
+  const lobby = resolve('lobby', 'games', '');
+  ok(lobby && lobby.url === 'https://lobby.faforever.com/games',
+    'upstream: the public lobby list resolves to lobby.faforever.com/games', lobby && lobby.url);
+  eq(resolve('lobby', 'players', ''), null, 'upstream: nothing else on the lobby host is reachable');
+
   eq(resolve('faf', 'secretThing', ''), null, 'upstream: a resource not on the allowlist is refused');
   eq(resolve('nope', 'map', ''), null, 'upstream: an unknown route is refused');
   eq(resolve('faf', '../../etc/passwd', ''), null, 'upstream: traversal is refused');
@@ -80,8 +85,10 @@ function testStaticPaths() {
   eq(resolveFile(root, '/app.js%00.png'), null, 'static: a null byte is refused');
   eq(resolveFile(root, '/does-not-exist.css'), null, 'static: a missing file is null');
 
-  const js = resolveFile(root, '/app.js');
-  ok(js && /text\/javascript/.test(js.type), 'static: app.js gets a javascript content type');
+  // The app is a Vite build: hashed bundles under public/assets.
+  const bundle = fs.readdirSync(path.join(root, 'assets')).find((f) => f.endsWith('.js'));
+  const js = bundle && resolveFile(root, '/assets/' + bundle);
+  ok(js && /text\/javascript/.test(js.type), 'static: the app bundle gets a javascript content type');
 }
 
 /* -------------------------------------------------------- proxy behaviour */
@@ -206,21 +213,23 @@ async function testServer() {
     eq(health.status, 200, 'server: /healthz answers');
     const hj = JSON.parse(health.body);
     eq(hj.ok, true, 'server: health reports ok');
-    eq(hj.playTab, false, 'server: health states plainly that there is no Play tab');
+    eq(hj.playTab, true, 'server: health reports the Play tab (open lobbies)');
 
     const index = await request(s.port, '/');
     eq(index.status, 200, 'server: the app shell is served');
     ok(/text\/html/.test(index.headers['content-type']), 'server: the shell is HTML');
-    ok(index.body.includes('id="view"'), 'server: the shell contains the app mount point');
+    ok(index.body.includes('id="root"'), 'server: the shell contains the app mount point');
 
     const spa = await request(s.port, '/leaderboard');
     eq(spa.status, 200, 'server: an app route falls back to the shell');
-    ok(spa.body.includes('id="view"'), 'server: the fallback really is the shell');
+    ok(spa.body.includes('id="root"'), 'server: the fallback really is the shell');
 
     const missingAsset = await request(s.port, '/nope.css');
     eq(missingAsset.status, 404, 'server: a missing asset is a 404, not the shell');
 
-    const css = await request(s.port, '/style.css');
+    const cssHref = (index.body.match(/href="(\/assets\/[^"]+\.css)"/) || [])[1];
+    ok(Boolean(cssHref), 'server: the shell links the built stylesheet', cssHref);
+    const css = await request(s.port, cssHref || '/missing.css');
     eq(css.status, 200, 'server: the stylesheet is served');
     ok(/text\/css/.test(css.headers['content-type']), 'server: the stylesheet has the right type');
 
@@ -260,7 +269,7 @@ async function testServer() {
 /* ------------------------------------------------------------- auto-update */
 
 const VERIFY_FILES = ['server.js', 'lib/proxy.js', 'lib/static.js', 'lib/upstreams.js',
-  'lib/watcher.js', 'public/app.js', 'webtest.js'];
+  'lib/watcher.js', 'webtest.js'];
 
 /**
  * Stub git/node. On `git clone` it really creates the files verify() looks for,

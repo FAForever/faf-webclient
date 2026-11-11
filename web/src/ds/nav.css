@@ -1,0 +1,145 @@
+/* Icon-led persistent navigation, retaining the Python client's durable tabs. */
+/* Scrolls when the window is too short for fourteen tabs plus the Game folders
+   disclosure, which is the case on a laptop and the case for anybody who opens
+   the folders list. The shell is `overflow: hidden`, so without this the bottom
+   of the navigation was simply cut off: the reported half-visible button. */
+.tabbar {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  /* As much room under the last tab as over the first: without it the last
+     tab's highlight sat on the footer's rule. */
+  padding: 6px 0;
+  overflow-y: auto;
+  /* No scrollbar gutter: the sidebar scrolls only in a very short window, and a reserved strip would move its icons off the centre of the rail. */
+  overscroll-behavior: contain;
+}
+
+/* Never compressed to make room. Each group is as tall as its buttons, and the
+   `.tabbar` above scrolls instead: squeezing them is what clipped them. */
+.nav-group {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Collapses to nothing once the groups do not fit, so the bottom group follows
+   the top one straight away instead of being pushed out of the scroll area. */
+.nav-spacer {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  color: var(--color-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 450;
+  text-align: left;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease;
+}
+
+.tab:hover {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.tab-active {
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  font-weight: 600;
+}
+
+/* An action among tabs, so it reads as one: the accent says this leaves the
+   session rather than selecting a place inside it. */
+.tab-sign-in {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.tab-sign-in:hover {
+  color: var(--color-accent);
+}
+
+.tab svg {
+  flex: 0 0 auto;
+}
+
+/* Something waiting in that tab: a found match, or a dot for something
+   addressed to the player in chat or a search running (issue 429: the chat tab no
+   longer prints a count). Neutral unless it wants an answer, which takes the
+   accent; the label beside it is part of the tab's accessible name either way. */
+.tab {
+  position: relative;
+}
+
+.tab .tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: auto;
+  padding: 0 5px;
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+}
+
+.tab .tab-badge.is-loud {
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.tab .tab-badge.is-dot {
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  background: var(--color-muted);
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  .tab span {
+    display: none;
+  }
+
+  .tab {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  /* The labels go in the icon rail; the badge stays, on the icon's corner. */
+  .tab span.tab-badge {
+    display: inline-flex;
+    position: absolute;
+    top: 3px;
+    right: 8px;
+  }
+}
+
+.app-shell.is-sidebar-rail .tab span.tab-badge {
+  display: inline-flex;
+  position: absolute;
+  top: 3px;
+  right: 8px;
+}

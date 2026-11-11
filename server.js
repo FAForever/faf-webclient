@@ -167,7 +167,7 @@ const server = http.createServer((req, res) => {
       service: 'faf-web',
       uptimeSeconds: Math.floor((Date.now() - started) / 1000),
       cacheEntries: cache.size(),
-      playTab: false,
+      playTab: true,
       autoUpdate: watcher ? watcher.status() : { enabled: false }
     });
     return;
@@ -198,7 +198,7 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    log('info', 'listening', { port: PORT, publicDir: PUBLIC_DIR, playTab: false, autoUpdate: AUTO_UPDATE });
+    log('info', 'listening', { port: PORT, publicDir: PUBLIC_DIR, playTab: true, autoUpdate: AUTO_UPDATE });
   });
 
   if (AUTO_UPDATE) {

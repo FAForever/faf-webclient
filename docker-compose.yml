@@ -45,4 +45,4 @@ services:
       # Minimum 30000. One cheap `git ls-remote` per interval.
       UPDATE_INTERVAL_MS: "60000"
 
-    command: ["sh", "-c", "set -e; rm -rf /app; mkdir -p /app; git clone --depth 1 --branch main https://github.com/FAForeverRustClient/faf-web.git /app; cd /app; exec node server.js"]
+    command: ["sh", "-c", "set -e; rm -rf /app; mkdir -p /app; git clone --depth 1 --branch main https://github.com/Nuggets75/faf-web.git /app; cd /app; exec node server.js"]

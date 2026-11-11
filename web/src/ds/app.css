@@ -1,0 +1,446 @@
+/*
+ * Fonts before tokens, because a --font-sans naming a family with no
+ * @font-face behind it silently falls through to whatever the OS has. This
+ * import was missing for a long time, which is why the self-hosted Geist in
+ * fonts.css had never actually been fetched by anything.
+ *
+ * Declaring a face costs nothing on its own: a family no theme names is never
+ * downloaded. So this is inert today, and it is the line that has to be here
+ * before pointing any theme's --font-sans at a bundled family.
+ */
+@import "./fonts.css";
+@import "./tokens.css";
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-width: 560px;
+  height: 100%;
+  max-height: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+/* Country assets have square canvases, including their transparent padding.
+   Keep the whole image in a fixed slot: larger assets or a crowded player row
+   must not enlarge, crop or squeeze a flag. Nearest-neighbour keeps the small
+   bitmaps sharp on scaled screens. Apply this at every flagSrc call site. */
+img[src^="/flags/"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  max-width: 16px;
+  max-height: 16px;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}
+
+/* Scrollbars, everywhere, once.
+   The client drew the operating system's scrollbar in every list except the
+   changelog, which had styled its own. On Windows that means a grey track with
+   an arrow button at each end, and the arrow's square corner sitting inside a
+   rounded panel is what the report noticed: a square edge and a rounded edge
+   meeting at the same point. It is also two different scrollbars in one
+   window, which is the part that reads as unfinished.
+
+   A thumb and nothing else: no track, no buttons. The thumb keeps a
+   transparent border with `background-clip: padding-box`, which is what makes
+   it look inset rather than glued to the edge, and it is a token colour so it
+   follows the theme. Firefox has no pseudo-elements for this and takes the
+   `scrollbar-width` and `scrollbar-color` are deliberately *not* set. In
+   Chromium, and therefore in WebView2, setting either of the standard
+   properties switches the engine to its own scrollbar and ignores every
+   `::-webkit-scrollbar` rule. The changelog had already found that out the
+   hard way and pins them back to `auto` on its own list; this is the same
+   lesson, kept in one place. */
+
+/* The scrollbar's width, as a value: a scrolling area that keeps the room for
+   it (`scrollbar-gutter: stable`) takes this much off its right padding, so
+   its two sides match whether a scrollbar shows or not. */
+:root {
+  --scrollbar-size: 11px;
+}
+
+::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+  position: fixed;
+  inset: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:is([type="checkbox"], [type="radio"]):focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+/* A field takes its line on its own edge instead. A browser counts every
+   focus in something typed into as keyboard focus, so a click showed the
+   ring above too, 2 px wide and 2 px off the field in the text colour, and
+   clicking into a search box drew a heavy white frame round it. Fields drawn
+   inside a wrapper (`.search-field` and the like) light the wrapper instead,
+   with the accent border and soft halo every such field shares. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+/* The clear button every search field has. The browser draws it at about
+   9px, which was reported as hard to hit; this is a 22px target with the X
+   drawn as a mask, so it takes the theme's colour instead of the platform's.
+   The SVG's own colour does not matter: a mask reads only its shape. */
+input[type="search"]::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0 -6px 0 6px;
+  background-color: var(--color-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E") center / 13px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E") center / 13px no-repeat;
+  cursor: pointer;
+}
+
+input[type="search"]::-webkit-search-cancel-button:hover {
+  background-color: var(--color-text);
+}
+
+/* Every dropdown's arrow, drawn here rather than by the browser.
+
+   The browser draws its own arrow hard against the right edge, a few pixels
+   from the border, and no amount of `padding-right` moves it: padding only
+   moves the text. That is why every attempt to nudge it inwards failed. With
+   the native arrow off, the chevron is two strokes drawn as gradients in the
+   text colour, as the browser's own was, with its right edge 12.5px from the
+   border, and the right padding keeps the selected text clear of it. The two
+   stroke boxes overlap by a pixel: each stroke ends on its box's corner, and
+   meeting exactly at the corners clipped the tip flat.
+
+   `html` in front for weight: the feature stylesheets give their selects a
+   `background` and `padding` shorthand, and those must not wipe the chevron
+   or let the text run under it. A list box (`multiple` or `size`) has no
+   arrow and is left alone. */
+html select:not([multiple]):not([size]) {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 30px;
+  /* The text colour, softened: at full strength the chevron was the
+     brightest mark in the field and drew the eye from the value beside it. */
+  --select-chevron: color-mix(in srgb, currentColor 65%, transparent);
+  background-image:
+    linear-gradient(45deg, transparent calc(50% - 0.75px), var(--select-chevron) calc(50% - 0.75px), var(--select-chevron) calc(50% + 0.75px), transparent calc(50% + 0.75px)),
+    linear-gradient(135deg, transparent calc(50% - 0.75px), var(--select-chevron) calc(50% - 0.75px), var(--select-chevron) calc(50% + 0.75px), transparent calc(50% + 0.75px));
+  background-position: calc(100% - 18.5px) 50%, calc(100% - 12.5px) 50%;
+  background-size: 7px 7px;
+  background-repeat: no-repeat;
+}
+
+/* Every checkbox, drawn here rather than by the platform.
+
+   The native box is a 13px square in the operating system's own style, with
+   only its fill taking the theme's accent: a light grey frame on a dark panel
+   that looked borrowed from another application. This one is the client's
+   own control: the field's surface and border, a radius the size of the box's
+   other corners, and when ticked the accent with the tick drawn as a mask, so
+   it takes the theme's colours. An indeterminate box shows a bar. `html` in
+   front for weight over the feature stylesheets' `accent-color` rules, which
+   now have nothing to colour. The native margins stay: labels everywhere
+   were spaced around them. Switches keep their own hidden, full-size input. */
+html input[type="checkbox"]:not(:where(.switch-input)) {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+html input[type="checkbox"]:not(:where(.switch-input))::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background-color: var(--color-accent-contrast);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2l2.4 2.4 4.6-5'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2l2.4 2.4 4.6-5'/%3E%3C/svg%3E") center / contain no-repeat;
+  transform: scale(0.4);
+  opacity: 0;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+html input[type="checkbox"]:not(:where(.switch-input)):hover:not(:disabled) {
+  border-color: var(--color-muted);
+}
+
+html input[type="checkbox"]:not(:where(.switch-input)):checked,
+html input[type="checkbox"]:not(:where(.switch-input)):indeterminate {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+html input[type="checkbox"]:not(:where(.switch-input)):checked::after,
+html input[type="checkbox"]:not(:where(.switch-input)):indeterminate::after {
+  transform: none;
+  opacity: 1;
+}
+
+html input[type="checkbox"]:not(:where(.switch-input)):indeterminate::after {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3 6h6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M3 6h6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+html input[type="checkbox"]:not(:where(.switch-input)):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+html input[type="checkbox"]:not(:where(.switch-input)):disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+html[data-density="compact"],
+html[data-density="compact"] body {
+  font-size: 13px;
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+::selection {
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+}
+
+/* Card */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: calc(var(--space-4) * 1.5);
+}
+
+/* Buttons. The shape is shared by every variant, `btn-danger` included: it
+   lives in modal.css beside the confirmation it belongs to, and without this
+   selector it had only colours, so the destructive button in every uninstall
+   dialog drew with the browser's own padding and square corners. */
+.btn-primary,
+.btn-ghost,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 32px;
+  line-height: 1.2;
+  color: var(--color-text);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+
+.btn-primary {
+  border: 1px solid transparent;
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btn-ghost {
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+}
+
+/* The other half of a pair with a primary button, Cancel beside Host game.
+   Both are 32 px, but an outline at 8 % disappears against a dialog's
+   surface beside a solid block, and the pair read as two sizes. */
+.btn-ghost:has(+ .btn-primary) {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+/* The default variant, so most buttons in the client: without this a
+   disabled one looked and hovered exactly like an enabled one, and a click
+   that did nothing read as a click that failed. */
+.btn-ghost:disabled {
+  color: var(--color-muted);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.icon-button {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border-color: transparent;
+}
+
+.error {
+  margin-top: var(--space-3);
+  color: var(--color-error-text);
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+/* Shared feature heading */
+.feature-heading {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  gap: var(--space-3);
+  margin-bottom: 16px;
+}
+
+.feature-heading h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.feature-heading .spacer {
+  flex: 1;
+}
+
+/* Shared view heading (placeholder + settings tabs) */
+.view-title {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.placeholder {
+  padding: var(--space-4) 0;
+}
+
+/* Embedded external sites (Units and News). Size to 100% of the
+   workspace container without forcing an outer window scrollbar. */
+.embed-view {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Slim strip above the frame: it names the origin the page comes from and
+   keeps a real browser one click away, which is the only reliable fallback
+   when the system webview renders someone else's page wrongly. */
+.embed-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.embed-toolbar-source {
+  font-size: 11px;
+}
+
+.embed-open-external {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.embed-frame {
+  width: 100%;
+  flex: 1;
+  /* Without this a flex child refuses to shrink below its content height and
+     the frame pushes the toolbar off the top of the workspace. */
+  min-height: 0;
+  border: none;
+}

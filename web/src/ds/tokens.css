@@ -1,0 +1,388 @@
+/*
+ * Design tokens: the central theming contract.
+ *
+ * Components reference these semantic CSS variables ONLY (never raw hex/px), so a
+ * theme is a token set, not a code change. The active theme is chosen by the
+ * backend `settings.theme` and applied as `<html data-theme="…">` (see App.tsx).
+ *
+ *   :root                       → forgeDark (default neutral dark workspace)
+ *   [data-theme="forgeLight"]   → neutral light workspace
+ *   [data-theme="javaClient"]   → FAF Java client aesthetic
+ *   [data-theme="pythonClient"] → FAF Python client aesthetic
+ *
+ * To add a theme: add a `[data-theme="…"]` block + a `Theme` variant in
+ * faf-domain. No component is touched.
+ */
+
+/* ── forgeDark (default): precision carbon-zinc workspace ───────────── */
+:root {
+  color-scheme: dark;
+  --color-bg: #171718;
+  --color-sidebar: #121214;
+  --color-surface: #1f1f20;
+  --color-surface-raised: #28282a;
+  --color-surface-hover: #313133;
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+  --color-text: #ffffff;
+  --color-muted: #a1a1aa;
+  /* The quietest text, which is mostly small metadata, so it still has to clear
+     4.5:1: 5.5 on the page, 5.1 on a surface, 4.5 on a raised one. #71717a was
+     3.4 on a surface. One step under muted (1.27:1 between the two) so the
+     hierarchy survives. */
+  --color-subtle: #8e8e96;
+  --color-accent: #ffffff;
+  --color-accent-contrast: #121214;
+  --color-accent-glow: rgba(255, 255, 255, 0.12);
+
+  /* Ink for the FAF wordmark, which ships as a single-colour mask rather than
+     a fixed-colour image so it survives a light theme. See BrandMark.tsx. */
+  --color-brand-mark: #ffffff;
+
+  --color-ok: #70b98a;
+  --color-warn: #d6a35d;
+  --color-error: #e06c75;
+  /* The same three for text and icons: a label in a status colour, such as a
+     result reading Victory or Defeat. Separate because the colours above are
+     also fills, behind white labels and as outlines, and a colour dark or
+     light enough to read as small text on a theme's surfaces is not always
+     the one that fill wants. Here they are the same; a theme sets its own
+     where its fill colour falls short of 4.5:1 as text. */
+  --color-ok-text: #70b98a;
+  --color-warn-text: #d6a35d;
+  --color-error-text: #e06c75;
+  --color-faction-uef: #4b9de8;
+  --color-faction-aeon: #62ad72;
+  /* A shade lighter than it was (#dc6464): faction names are printed in these,
+     and Cybran was 4.2:1 on a raised surface. Each one clears 4.5:1 on every
+     surface of its theme; `tokens.contrast.test.ts` holds every theme to it. */
+  --color-faction-cybran: #df7171;
+  --color-faction-seraphim: #d5ad45;
+  --color-league-bronze: #bf8056;
+  --color-league-silver: #b6bec7;
+  --color-league-gold: #d9ad57;
+  --color-league-diamond: #5fbae8;
+  --color-league-master: #8aaec4;
+  --color-league-grandmaster: #e27e84;
+
+  /* The FAF unit database's faction colours, for the unit history, which
+     draws units the way it does. Fixed in every theme: they are its colours,
+     not this palette's. The plain one is what its strategic icons are drawn
+     in (the shell draws ours the same) and marks a picked unit; `tile`,
+     `edge` and `glow` are its unit tile's fill, border and inner light,
+     worked out from its colors.sass and the thumb's color.adjust steps. */
+  --color-unitdb-uef: #55aaff;
+  --color-unitdb-uef-tile: rgba(45, 120, 178, 0.13);
+  --color-unitdb-uef-edge: rgba(148, 193, 228, 0.33);
+  --color-unitdb-uef-glow: rgba(70, 174, 255, 0.43);
+  --color-unitdb-aeon: #20ff20;
+  --color-unitdb-aeon-tile: rgba(25, 179, 64, 0.13);
+  --color-unitdb-aeon-edge: rgba(121, 236, 150, 0.33);
+  --color-unitdb-aeon-glow: rgba(51, 255, 103, 0.43);
+  --color-unitdb-cybran: #ff5050;
+  --color-unitdb-cybran-tile: rgba(223, 45, 14, 0.1);
+  --color-unitdb-cybran-edge: rgba(248, 158, 142, 0.3);
+  --color-unitdb-cybran-glow: rgba(255, 109, 84, 0.4);
+  --color-unitdb-seraphim: #ffbe2c;
+  --color-unitdb-seraphim-tile: rgba(252, 180, 25, 0.1);
+  --color-unitdb-seraphim-edge: rgba(254, 229, 176, 0.3);
+  --color-unitdb-seraphim-glow: rgba(255, 213, 124, 0.4);
+
+  /* Calendar categories. Aliases rather than six new colours: the palette
+     already carries four faction hues and a gold that read as distinct at the
+     3 px edge of an event chip, and inventing six more would mean maintaining
+     them in every theme for no gain. They carry no faction meaning here. */
+  --color-event-tournament: var(--color-league-gold);
+  --color-event-cgn: var(--color-faction-cybran);
+  --color-event-meetup: var(--color-faction-aeon);
+  --color-event-patch: var(--color-faction-uef);
+  --color-event-ladderPool: var(--color-league-diamond);
+  --color-event-other: var(--color-subtle);
+
+  /* Training kinds, on a cover that has no picture: what a click opens, read
+     before the title. Aliases again, chosen for what they evoke rather than
+     for any faction: engineers build, YouTube is red, reading is blue. */
+  --color-training-buildOrder: var(--color-unit-engineer);
+  --color-training-video: var(--color-faction-cybran);
+  --color-training-guide: var(--color-faction-uef);
+  --color-training-replayAnalysis: var(--color-unit-transportation);
+  --color-training-lesson: var(--color-faction-aeon);
+  --color-training-community: var(--color-subtle);
+
+  /* Text laid over a picture, on the dark gradient that carries it, and what
+     a picture's frame shows before it has loaded. Fixed in every theme on
+     purpose: what is under them is a picture, which a light theme does not
+     make light, so no theme block overrides these. */
+  --color-on-picture: #ffffff;
+  --color-picture-backdrop: #0b0f0a;
+
+  /* The number a player card is opened for.
+     Its own token rather than `--color-accent`, because in this theme the
+     accent *is* the text colour: a rating drawn in it would be the white it
+     already was. The two themes that borrow a reference client's palette use
+     that client's accent below, which is the same intent in their own colour. */
+  --color-rating: #d9ad57;
+  /* A series author's amber identity, independent of caution status. */
+  --color-series-amber: #d9ad57;
+
+  /* Lines of one chart that are told apart by colour: the unit history's
+     values and units. Eight hues in a fixed order, checked with the palette
+     validator against this surface (every adjacent pair clear for each kind
+     of colour vision). Assigned in order, never cycled; a ninth line does not
+     get a colour. */
+  --color-chart-1: #3987e5;
+  --color-chart-2: #d95926;
+  --color-chart-3: #199e70;
+  --color-chart-4: #c98500;
+  --color-chart-5: #d55181;
+  --color-chart-6: #008300;
+  --color-chart-7: #9085e9;
+  --color-chart-8: #e66767;
+
+  /* A lobby with somebody from your friends list in it. An alias rather than a
+     fifth green kept in step across four themes: the palette already carries
+     one that reads at the 3 px edge of a row in all of them, and the calendar
+     categories above set the precedent for naming a use instead of inventing a
+     hue. Aliases resolve against the theme block's own value, because every
+     block styles the same root element. */
+  --color-friend: var(--color-ok);
+  --color-foe: var(--color-error);
+
+  /* The unit categories of a replay's end-of-game statistics. Twelve bars
+     stand side by side in one group there, and twelve bars in one colour say
+     nothing at all about what was built.
+
+     Values rather than aliases, which is the exception the rest of this file
+     does not make. The palette carries about eight hue families -- two greens
+     that read as one, two blues, three golds, three reds -- so aliasing
+     twelve categories onto it put the commander and the experimentals in the
+     same gold and the engineers and the SACUs in the same orange, which is
+     the bug this was meant to fix. A categorical scale has one job, which is
+     that no two of its entries are mistaken for each other, and it has to be
+     spelled out to do it. Mid-tone throughout, so the set reads on the light
+     themes as well as the dark ones, and deliberately not theme-tuned: these
+     name twelve kinds of unit, not twelve moods. */
+  --color-unit-land: #5fa855;
+  --color-unit-air: #4b9de8;
+  --color-unit-naval: #2bb3ad;
+  --color-unit-structures: #b6bec7;
+  --color-unit-engineer: #e0873c;
+  --color-unit-transportation: #9b7ce0;
+  --color-unit-cdr: #e8c245;
+  --color-unit-sacu: #e2679a;
+  --color-unit-tech1: #8a8f98;
+  --color-unit-tech2: #6fd3f5;
+  --color-unit-tech3: #4f6bd8;
+  --color-unit-experimental: #dc5a5a;
+
+  /* A replay's build order lanes: the categories and colours of the
+     maintainer's own build order analyser (bo-sheppy), so a run reads the
+     same in both. Not theme-tuned, for the reason above. */
+  --color-bo-acu: #b39ddb;
+  --color-bo-factory: #8d6e63;
+  --color-bo-engie: #4dd0e1;
+  --color-bo-mex: #66bb6a;
+  --color-bo-power: #ffd54f;
+  --color-bo-structure: #90a4ae;
+  --color-bo-unit: #ef5350;
+  --color-bo-bomber: #ec407a;
+  --color-bo-interceptor: #29b6f6;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  /* A capsule: any value past half the element's height rounds the ends fully,
+     and sixteen stylesheets already asked for this token by name. Without the
+     declaration every one of those `var(--radius-pill)` rules was invalid at
+     computed-value time and fell back to the initial 0, which is why the tab
+     counts, the vault badges and the upload chips all had square corners. */
+  --radius-pill: 999px;
+
+  /* The state-change duration the design rules give (100 to 150 ms). Five
+     transitions referenced this name before it existed, so they were dropped
+     as invalid and snapped instead of easing. */
+  --transition-fast: 120ms ease;
+
+  /* Elevation. Three steps, deliberately: a hairline lift for a control that
+     sits on a surface, a lift for something floating over the workspace, and
+     the popover. Features used to write their own `rgba(0, 0, 0, …)` shadows,
+     which is how five slightly different "1 px drop shadow" values ended up in
+     the client. */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-popover: 0 16px 48px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.22);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+
+  --font-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+
+  /*
+   * Chat nickname tinting. Both reference clients colour nicks so a busy
+   * channel stays scannable; the *hue* is derived per nickname in JS (as a
+   * `--nick-hue` custom property), while saturation and lightness stay a theme
+   * decision so every generated colour keeps a readable contrast against this
+   * theme's surfaces. A theme that wants monochrome nicks sets saturation to 0%.
+   */
+  --chat-nick-saturation: 45%;
+  --chat-nick-lightness: 68%;
+}
+
+/* ── forgeLight: bright neutral workspace ───────────────────────────── */
+[data-theme='forgeLight'] {
+  color-scheme: light;
+  --color-bg: #f7f7f7;
+  --color-sidebar: #eeeeec;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f0f0f0;
+  --color-surface-hover: #e7e7e7;
+  --color-border: rgba(0, 0, 0, 0.09);
+  --color-border-strong: rgba(0, 0, 0, 0.17);
+  --color-text: #1b1b1b;
+  /* Both darkened together. Subtle has to clear 4.5:1 (4.8 on the page, 5.2 on
+     a surface, 4.5 on a raised one; #919191 was 3.2 on a surface), which leaves
+     no room under the old muted (#6f6f6f, itself only 4.4 on a raised surface)
+     for the step between them, so muted moved down to keep it (1.37:1). */
+  --color-muted: #585858;
+  --color-subtle: #6d6d6d;
+  --color-accent: #1b1b1b;
+  --color-accent-contrast: #ffffff;
+  --color-accent-glow: rgba(0, 0, 0, 0.12);
+  --color-brand-mark: #000000;
+  /* The same gold, taken down until it clears 4.5:1 on all three of this
+     theme's surfaces, the hover one included. */
+  --color-rating: #7d5a10;
+  --color-series-amber: #7d5a10;
+  /* The same eight hues stepped for a light surface. Three of them fall
+     under 3:1 on white, which is why the chart always has a legend and its
+     values a table. */
+  --color-chart-1: #2a78d6;
+  --color-chart-2: #eb6834;
+  --color-chart-3: #1baf7a;
+  --color-chart-4: #eda100;
+  --color-chart-5: #e87ba4;
+  --color-chart-6: #008300;
+  --color-chart-7: #6250d6;
+  --color-chart-8: #e34948;
+  --color-ok: #3f8f5d;
+  --color-warn: #a66d21;
+  --color-error: #c24d57;
+  /* Taken down, hue kept, until each clears 4.5:1 as text on the raised
+     surface: Victory was 3.5:1 there and Defeat 4.1:1. */
+  --color-ok-text: #35784e;
+  --color-warn-text: #93601d;
+  --color-error-text: #bb404a;
+  /* The four faction hues kept, each taken down until it clears 4.5:1 on the
+     raised surface (and so 5.2 or more on a plain one). The dark theme's were
+     2.0 to 3.5:1 here, and faction names are printed in them. */
+  --color-faction-uef: #356fa5;
+  --color-faction-aeon: #44774f;
+  --color-faction-cybran: #ad4e4e;
+  --color-faction-seraphim: #81692a;
+
+  /* Darker nicks so generated hues stay legible on a white surface. */
+  --chat-nick-saturation: 55%;
+  --chat-nick-lightness: 38%;
+}
+
+/* ── javaClient: JavaFX/Modena: cool blue-gray, rounder, Roboto, FAF blue ─ */
+[data-theme='javaClient'] {
+  color-scheme: dark;
+  --color-bg: #2b2f3a;
+  --color-sidebar: #242832;
+  --color-surface: #353a47;
+  --color-surface-raised: #3f4555;
+  --color-border: rgba(255, 255, 255, 0.10);
+  --color-border-strong: rgba(255, 255, 255, 0.20);
+  --color-text: #e8eaf0;
+  /* Lifted, hue kept, to the default theme's contrast on its own raised
+     surface: muted 5.7:1, subtle 4.6:1 (they were 3.8 and 2.2), so headings'
+     captions and the metadata under a name read as clearly here as there,
+     and one level stays a step below the other. */
+  --color-muted: #c3c9d1;
+  --color-subtle: #afb5be;
+  --color-surface-hover: #474e60;
+  --color-accent: #3d9bfd;
+  /* Dark on the accent rather than white: white on this blue is 2.9:1, too
+     faint for a primary button's label. This is 6.5:1. The accent itself stays
+     as bright as it is, because links and focus rings sit on the dark surfaces. */
+  --color-accent-contrast: #0b1220;
+  --color-accent-glow: rgba(61, 155, 253, 0.30);
+  /* A lighter tint of this theme's blue rather than the accent itself: the
+     accent is 3.9:1 on these surfaces, and the queue name above the rating is
+     11 px. */
+  --color-rating: #8ec7ff;
+  --color-ok: #4caf50;
+  --color-warn: #ff9800;
+  --color-error: #f44336;
+  /* Lifted towards white, hue kept, until each clears 4.5:1 as text on the
+     raised surface. The fills keep the Java client's own colours; as text
+     Defeat was 2.6:1 there and Victory 3.4:1. */
+  --color-ok-text: #7ac57d;
+  --color-warn-text: #ff9e0f;
+  --color-error-text: #f99b94;
+  /* Lifted towards white until each clears 4.5:1 on this theme's raised
+     surface, which is lighter than the default theme's: Cybran was 2.8:1. */
+  --color-faction-uef: #80baef;
+  --color-faction-aeon: #88c194;
+  --color-faction-cybran: #eaa1a1;
+  --color-faction-seraphim: #d6af4b;
+
+  --radius-md: 6px;
+
+  --font-sans: 'Roboto', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'Roboto Mono', 'JetBrains Mono', monospace;
+
+  --chat-nick-saturation: 60%;
+  --chat-nick-lightness: 70%;
+}
+
+/* ── pythonClient: PyQt/Fusion: neutral dark, square, system font, teal ── */
+[data-theme='pythonClient'] {
+  color-scheme: dark;
+  --color-bg: #2d2d30;
+  --color-sidebar: #252527;
+  --color-surface: #3a3a3d;
+  --color-surface-raised: #444448;
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-text: #dcdcdc;
+  /* Lifted for the Java theme's reason: they were 3.5 and 2.1:1 on the
+     raised surface. */
+  --color-muted: #c7c7c7;
+  --color-subtle: #b3b3b3;
+  --color-surface-hover: #4c4c51;
+  --color-accent: #1ba39c;
+  /* Dark on the accent for the Java theme's reason: white on this teal is
+     3.1:1, this is 5.5:1. */
+  --color-accent-contrast: #0a1f1e;
+  --color-accent-glow: rgba(27, 163, 156, 0.30);
+  /* Lifted off the accent for the same reason as the Java theme's. */
+  --color-rating: #45d2ca;
+  --color-ok: #5fb35f;
+  --color-warn: #d8a200;
+  --color-error: #d65454;
+  /* Lifted for the Java theme's reason: Defeat was 2.4:1 as text here. */
+  --color-ok-text: #80c380;
+  --color-warn-text: #e2aa00;
+  --color-error-text: #e8a0a0;
+  /* Lifted for the Java theme's reason. */
+  --color-faction-uef: #7eb9ef;
+  --color-faction-aeon: #86c092;
+  --color-faction-cybran: #e9a0a0;
+  --color-faction-seraphim: #d5ae47;
+
+  --radius-md: 2px;
+  /* This theme is the square one, so its capsules are not capsules. */
+  --radius-pill: 3px;
+
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Cascadia Code', 'Courier New', monospace;
+
+  --chat-nick-saturation: 65%;
+  --chat-nick-lightness: 66%;
+}
