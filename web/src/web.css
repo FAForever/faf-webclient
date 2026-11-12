@@ -427,10 +427,27 @@ body {
 .web-embed {
   flex: 1;
   width: 100%;
-  min-height: 70vh;
+  min-height: 0;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
+}
+
+/* Units and FAF Daily: another site in a frame that fills the tab under its
+   header, with the page's usual padding. The page itself does not scroll;
+   the framed site does. */
+.web-shell .content.content-tab-units,
+.web-shell .content.content-tab-daily {
+  overflow: hidden;
+  scrollbar-gutter: auto;
+  --content-gutter: 0px;
+}
+
+.web-shell .content-inner.content-units,
+.web-shell .content-inner.content-daily {
+  height: 100%;
+  padding: 28px 28px 18px;
+  overflow: hidden;
 }
 
 /* In the desktop client these tabs fill the window and scroll inside their own
@@ -543,6 +560,32 @@ body {
   .web-shell .workspace {
     grid-column: 1;
     grid-row: 2;
+  }
+
+  /* A framed site gets everything under the top bar: no header (the top bar
+     names the tab and links to the site), no padding, no border. */
+  .web-shell .content-inner.content-units,
+  .web-shell .content-inner.content-daily {
+    padding: 0;
+  }
+
+  .web-view-embed {
+    gap: 0;
+  }
+
+  .web-view-embed .web-view-header {
+    display: none;
+  }
+
+  .web-embed {
+    border: 0;
+    border-radius: 0;
+  }
+
+  .web-topbar .web-topbar-open {
+    width: 36px;
+    height: 36px;
+    color: var(--color-text);
   }
 
   .web-grid {

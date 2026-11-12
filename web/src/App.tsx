@@ -20,7 +20,13 @@ interface TabDef {
   icon: IconName;
   Component: ComponentType;
   bottom?: boolean;
+  /** Another site shown in a frame: on phones the frame gets the whole screen,
+      and the top bar carries the link to open it on its own. */
+  external?: () => string;
 }
+
+const UNITDB_URL = "https://unitdb.faforever.com/";
+const dailyUrl = () => `${fafUrl("daily")}/`;
 
 // Same order, labels and icons as the Rust client's sidebar (ui/src/features/nav/tabs.tsx),
 // minus Training and Settings. Chat is the one tab that needs a login.
@@ -39,7 +45,8 @@ const TABS: TabDef[] = [
     id: "units",
     label: "Units",
     icon: "units",
-    Component: () => <EmbedView title="Units" description="Stats for every unit." url="https://unitdb.faforever.com/" />,
+    Component: () => <EmbedView title="Units" description="Stats for every unit." url={UNITDB_URL} />,
+    external: () => UNITDB_URL,
   },
   {
     id: "daily",
@@ -47,7 +54,8 @@ const TABS: TabDef[] = [
     icon: "gamepad",
     // FAF's own daily unit guessing game, framed like Units. Same site as this
     // one (faforever.com), so its saved progress is the same as on the site itself.
-    Component: () => <EmbedView title="FAF Daily" description="Guess the daily unit." url={`${fafUrl("daily")}/`} />,
+    Component: () => <EmbedView title="FAF Daily" description="Guess the daily unit." url={dailyUrl()} />,
+    external: dailyUrl,
   },
   { id: "links", label: "Links", icon: "external", Component: LinksView, bottom: true },
 ];
@@ -112,6 +120,11 @@ export function App() {
         <span className="web-topbar-title">
           <Icon name={active.icon} size={17} /> {active.label}
         </span>
+        {active.external && (
+          <a className="web-icon-button web-topbar-open" href={active.external()} target="_blank" rel="noopener noreferrer" aria-label={`Open ${active.label} on its own`}>
+            <Icon name="external" size={18} />
+          </a>
+        )}
         <BrandMark size={28} />
       </header>
 
