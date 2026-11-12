@@ -55,6 +55,8 @@ The Chat tab logs players in with their FAF account and connects them to FAF's c
 
 FAF's chat lets one account be connected several times, so the desktop client stays online. Both connections share their channels: closing a channel tab here only hides it, and `/part` leaves it everywhere.
 
+Who is online: FAF's chat server keeps every account in its channels for 30 days after it last connected (Ergo `always-on: mandatory`) and marks it away while nobody is connected as it (`auto-away: mandatory`), so a channel's name list holds thousands of people who are not there. The Chat tab asks the server who is away (`WHO` with WHOX, then `away-notify`) and lists only the rest. Avatars and clan tags come from FAF's API, a batch of names at a time (`web/src/chat/profiles.ts`). Country flags, friends and who is in a game are not in the API: they come from faf-player-service and faf-game-service over RabbitMQ, which this site does not read yet.
+
 The client is "FAF Web" in gitops-stack `apps/ory-hydra/values.yaml`. Its only redirect URI is `https://webclient.$BASE_DOMAIN/auth/callback`, so login works on FAF's own deployments and nowhere else. On a private test server, set `FAF_LOGIN_CLIENT_ID=off` and the Chat tab says login isn't available. `GET /healthz` shows `"chatLogin"`.
 
 ## Layout

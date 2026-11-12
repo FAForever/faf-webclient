@@ -31,6 +31,14 @@ export interface ChatUser {
   name: string;
   /** Channel status symbols, highest first, e.g. "@" or "~@". */
   prefix: string;
+  /**
+   * Whether nobody is connected as this user. FAF's chat keeps every account
+   * in its channels for 30 days after it last connected ("always-on") and
+   * marks it away while it has no connection ("auto-away"), so a channel's
+   * name list is mostly people who are not there. Null until the server has
+   * said (WHO), which is right after joining.
+   */
+  away: boolean | null;
 }
 
 export interface Conversation {
@@ -48,10 +56,16 @@ export interface Conversation {
   /** Bumped whenever `messages` or `users` change, for memoised views. */
   messagesVersion: number;
   usersVersion: number;
+  /** Whether the server has said who in `users` is away (see ChatUser.away). */
+  presenceKnown: boolean;
 }
 
 const SUBPROTOCOL = "binary.ircv3.net";
-const WANTED_CAPS = ["sasl", "server-time", "message-tags", "multi-prefix", "batch", "draft/chathistory", "echo-message"];
+// away-notify: told when somebody connects or disconnects, which on FAF's chat
+// is how being online shows (see ChatUser.away).
+const WANTED_CAPS = ["sasl", "server-time", "message-tags", "multi-prefix", "batch", "draft/chathistory", "echo-message", "away-notify"];
+/** WHOX query type for the presence list: token, nick, flags. */
+const WHO_TOKEN = "71";
 const CHANNEL_HISTORY = 100;
 const PRIVATE_HISTORY = 50;
 const MAX_MESSAGES = 600;
@@ -95,6 +109,10 @@ class ChatClient {
   /** CHANMODES groups A, B, C: modes that take a parameter. */
   private paramModes = { always: "beIkqaohv", whenSet: "l" };
   private pendingNames = new Map<string, ChatUser[]>();
+  /** Whether the server answers WHOX (ISUPPORT WHOX). */
+  private whox = false;
+  /** channel key -> nick key -> away, while a WHO answer is arriving. */
+  private pendingWho = new Map<string, Map<string, boolean>>();
   /** batch id -> root history batch id */
   private batchRoots = new Map<string, string>();
   private historyHeld = new Map<string, { target: string; lines: { conversation: string; message: ChatMessage }[] }>();
@@ -300,6 +318,7 @@ class ChatClient {
         historyAsked: false,
         messagesVersion: 0,
         usersVersion: 0,
+        presenceKnown: false,
       };
       this.conversations.set(key, conv);
       if (!this.activeKey || this.conversations.get(this.activeKey)?.hidden) this.activeKey = key;
@@ -566,6 +585,8 @@ class ChatClient {
               [...match[1]].forEach((mode, i) => (this.prefixModes[mode] = match[2][i]));
               this.prefixOrder = match[2];
             }
+          } else if (name === "WHOX") {
+            this.whox = true;
           } else if (name === "CHANMODES") {
             const [a = "", b = "", c = ""] = value.split(",");
             this.paramModes = { always: a + b + Object.keys(this.prefixModes).join(""), whenSet: c };
@@ -592,10 +613,27 @@ class ChatClient {
         }
         const conv = this.conversation(channel, false);
         if (conv) {
-          conv.users.set(keyOf(line.source), { name: line.source, prefix: "" });
+          // Joining takes a connection, so whoever joined is here.
+          conv.users.set(keyOf(line.source), { name: line.source, prefix: "", away: false });
           conv.usersVersion++;
           this.changed();
         }
+        return;
+      }
+      case "AWAY": {
+        // away-notify: with a message they went away (FAF: disconnected),
+        // without one they are back.
+        if (this.historyRoot(line)) return;
+        const key = keyOf(line.source);
+        const away = Boolean(p[0]);
+        for (const conv of this.conversations.values()) {
+          const user = conv.users.get(key);
+          if (user && user.away !== away) {
+            user.away = away;
+            conv.usersVersion++;
+          }
+        }
+        this.changed();
         return;
       }
       case "PART":
@@ -679,7 +717,7 @@ class ChatClient {
           let i = 0;
           while (i < entry.length && this.prefixOrder.includes(entry[i])) i++;
           const name = entry.slice(i).split("!")[0];
-          if (name) list.push({ name, prefix: entry.slice(0, i) });
+          if (name) list.push({ name, prefix: entry.slice(0, i), away: null });
         }
         this.pendingNames.set(keyOf(channel), list);
         return;
@@ -691,10 +729,56 @@ class ChatClient {
         this.pendingNames.delete(keyOf(channel));
         const conv = this.conversation(channel, false);
         if (conv) {
+          // What was known about who is away survives a fresh name list.
+          const before = conv.users;
+          for (const user of list) {
+            const known = before.get(keyOf(user.name))?.away;
+            if (known != null) user.away = known;
+          }
+          if (keyOf(this.nick)) {
+            const me = list.find((user) => keyOf(user.name) === keyOf(this.nick));
+            if (me) me.away = false;
+          }
           conv.users = new Map(list.map((user) => [keyOf(user.name), user]));
           conv.usersVersion++;
           this.changed();
+          // Who of them is actually connected.
+          this.pendingWho.set(conv.key, new Map());
+          this.sendRaw(this.whox ? formatLine("WHO", conv.name, `%tnf,${WHO_TOKEN}`) : formatLine("WHO", conv.name));
         }
+        return;
+      }
+      case "352":
+      case "354": {
+        // 352: me channel user host server nick flags :hops realname
+        // 354 (WHOX %tnf): me token nick flags
+        const whox = line.command === "354";
+        if (whox && p[1] !== WHO_TOKEN) return;
+        const nick = whox ? p[2] : p[5];
+        const flags = whox ? p[3] : p[6];
+        if (!nick || !flags) return;
+        // A WHOX reply does not name the channel; every pending list takes it.
+        const channelKey = whox ? null : keyOf(p[1] ?? "");
+        for (const [key, pending] of this.pendingWho) {
+          if (channelKey === null || channelKey === key) pending.set(keyOf(nick), flags.startsWith("G"));
+        }
+        return;
+      }
+      case "315": {
+        const channelKey = keyOf(p[1] ?? "");
+        const pending = this.pendingWho.get(channelKey);
+        if (!pending) return;
+        this.pendingWho.delete(channelKey);
+        const conv = this.conversations.get(channelKey);
+        if (!conv) return;
+        for (const [key, user] of conv.users) {
+          const away = pending.get(key);
+          // Not listed means not reachable: treated as away.
+          user.away = keyOf(user.name) === keyOf(this.nick) ? false : away ?? true;
+        }
+        conv.presenceKnown = true;
+        conv.usersVersion++;
+        this.changed();
         return;
       }
       case "PRIVMSG":

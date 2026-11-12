@@ -6,31 +6,50 @@
   max-width: none;
 }
 
-/* ---- filters: labelled fields in one panel, as the Rust client's vault --- */
+/* ---- the search panel, after the Rust client's vault search (VaultSearch,
+   search-panel): labelled fields that wrap, ranges, presets and switches. -- */
 
-.replay-filters {
+.replay-search {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3) var(--space-4);
+  flex-direction: column;
+  gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
 }
 
-.replay-filter {
+.replay-search-top,
+.replay-search-fields,
+.replay-search-ranges,
+.replay-search-more {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.replay-search-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.replay-field {
+  display: flex;
+  flex: 1 1 150px;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  max-width: 260px;
 }
 
-.replay-filter-player {
-  flex: 2 1 340px;
-  max-width: 560px;
+.replay-field.is-wide {
+  flex: 1 1 260px;
+  max-width: 480px;
 }
 
-.replay-filter-id {
-  flex: 1 1 300px;
-  max-width: 420px;
+.replay-field .web-input {
+  width: 100%;
+  min-height: 34px;
+  box-sizing: border-box;
 }
 
 .replay-filter-label {
@@ -39,17 +58,117 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.replay-filter-row {
+.replay-range-unit {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+
+.replay-range,
+.replay-sort {
+  flex: 1 1 200px;
+  max-width: 300px;
+}
+
+/* Two date pickers need room for "dd/mm/yyyy" and the calendar button each. */
+.replay-dates {
+  flex: 1 1 290px;
+  max-width: 340px;
+}
+
+.replay-range-inputs {
   display: flex;
-  gap: var(--space-2);
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
-.replay-filter-row .web-button {
+.replay-range-inputs .web-input {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* The date pickers' calendar icon follows the theme's text colour. */
+.replay-dates input[type="date"] {
+  color-scheme: dark;
+}
+
+.web-button.replay-sort-direction {
   flex: none;
+  justify-content: center;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+}
+
+.replay-search-submit {
+  min-height: 34px;
+}
+
+/* `.web-button` because this file is bundled before web.css. */
+.web-button.replay-search-toggle {
+  display: none;
+  min-height: 34px;
+}
+
+.replay-search-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.replay-search-row .spacer {
+  flex: 1;
+}
+
+.replay-presets,
+.replay-checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.replay-presets {
+  gap: var(--space-2);
+}
+
+.replay-search-divider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--color-border);
+}
+
+.replay-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.replay-check input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.replay-search-more {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.replay-search-note {
+  margin: 0;
+  font-size: 13px;
 }
 
 /* ---- the cards ------------------------------------------------------------ */
@@ -315,14 +434,75 @@
    width, the facts at the bottom. ---------------------------------------- */
 
 @media (max-width: 560px) {
-  .replay-filter-player,
-  .replay-filter-id {
-    flex-basis: 100%;
+  /* The search: the player field and Search on top, the rest behind
+     "Filters", two fields to a row. */
+  .replay-search {
+    padding: var(--space-3);
+  }
+
+  .replay-search-top {
+    flex-wrap: nowrap;
+  }
+
+  .replay-search-top .replay-field .replay-filter-label {
+    display: none;
+  }
+
+  .web-button.replay-search-toggle {
+    display: inline-flex;
+    white-space: nowrap;
+  }
+
+  /* The player field gets the row: Search keeps its icon only. */
+  .replay-search-submit-label {
+    display: none;
+  }
+
+  .web-button.replay-search-submit {
+    justify-content: center;
+    width: 40px;
+    padding: 0;
+  }
+
+  .replay-presets .web-button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .replay-search:not(.is-open) .replay-search-panel {
+    display: none;
+  }
+
+  .replay-field,
+  .replay-range,
+  .replay-dates,
+  .replay-sort {
+    flex: 1 1 calc(50% - var(--space-3));
     max-width: none;
   }
 
-  .replay-filters {
-    padding: var(--space-3);
+  .replay-range,
+  .replay-dates,
+  .replay-sort {
+    flex-basis: 100%;
+  }
+
+  .replay-field .web-input,
+  .replay-range-inputs .web-input {
+    font-size: 16px;
+  }
+
+  .replay-search-divider,
+  .replay-search-row .spacer {
+    display: none;
+  }
+
+  .replay-search-row {
+    gap: var(--space-2);
+  }
+
+  .replay-presets {
+    flex: 1 1 100%;
   }
 
   .replay-card {

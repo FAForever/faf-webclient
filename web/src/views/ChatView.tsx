@@ -13,6 +13,7 @@ import { Fragment, memo, useEffect, useLayoutEffect, useMemo, useRef, useState, 
 import { AuthError, beginLogin, completeLogin, getSession, logout, siteConfig, subscribeSession, type SiteConfig } from "../auth";
 import { chat, type ChatMessage, type ChatUser, type Conversation } from "../chat/client";
 import "../chat/chat.css";
+import { profiles, type Profile } from "../chat/profiles";
 import { Icon } from "../ds/Icon";
 import { ViewHeader } from "./common";
 
@@ -256,8 +257,39 @@ const MessageLog = memo(function MessageLog({
 
 // ---- the people in a channel
 
-type Group = "self" | "moderators" | "players";
-const GROUP_LABEL: Record<Group, string> = { self: "You", moderators: "Moderators & admins", players: "Players" };
+type Group = "self" | "moderators" | "clan" | "players";
+const GROUP_LABEL: Record<Group, string> = { self: "You", moderators: "Moderators & admins", clan: "Clan", players: "Players" };
+
+/** The people in a channel who are connected right now (see ChatUser.away). */
+export function onlineUsers(conversation: Conversation): ChatUser[] {
+  return [...conversation.users.values()].filter((user) => user.away === false);
+}
+
+function RosterRow({ user, group, self, profile, onOpen }: { user: ChatUser; group: Group; self: string; profile: Profile | null | undefined; onOpen: (nick: string) => void }) {
+  const style = nameStyle(user.name, user, self);
+  return (
+    <li className="chat-roster-item">
+      <div className="chat-roster-user">
+        <button
+          type="button"
+          className="chat-roster-identity"
+          title={group === "self" ? undefined : `Message ${user.name}`}
+          onClick={() => group !== "self" && onOpen(user.name)}
+        >
+          <span className="chat-avatar">
+            {profile?.avatarUrl && (
+              <img src={profile.avatarUrl} alt="" title={profile.avatarTooltip ?? undefined} width={40} height={20} loading="lazy" decoding="async" draggable={false} />
+            )}
+          </span>
+          <span className={style ? "chat-nick" : "chat-nick is-monochrome"} style={style}>
+            {profile?.clan && <span className="chat-clan">[{profile.clan}]</span>}
+            {user.name}
+          </span>
+        </button>
+      </div>
+    </li>
+  );
+}
 
 const Roster = memo(function Roster({
   conversation,
@@ -272,39 +304,60 @@ const Roster = memo(function Roster({
 }) {
   const [filter, setFilter] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const profileVersion = useSyncExternalStore(profiles.subscribe, profiles.getVersion);
+
+  // `version` stands for the contents of the users map, which is mutated in place.
+  const online = useMemo(() => onlineUsers(conversation), [conversation, version]);
+
+  // Avatars and clan tags for whoever is on the list.
+  useEffect(() => {
+    profiles.want(online.map((user) => user.name));
+  }, [online]);
+
+  const myClan = self ? profiles.get(self)?.clan ?? null : null;
 
   const groups = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    const result: Record<Group, ChatUser[]> = { self: [], moderators: [], players: [] };
-    for (const user of conversation.users.values()) {
-      if (needle && !user.name.toLowerCase().includes(needle)) continue;
-      const group: Group = self && user.name.toLowerCase() === self.toLowerCase() ? "self" : isModerator(user) ? "moderators" : "players";
+    const result: Record<Group, ChatUser[]> = { self: [], moderators: [], clan: [], players: [] };
+    for (const user of online) {
+      const clan = profiles.get(user.name)?.clan ?? null;
+      if (needle && !user.name.toLowerCase().includes(needle) && !(clan && clan.toLowerCase().includes(needle))) continue;
+      const group: Group =
+        self && user.name.toLowerCase() === self.toLowerCase()
+          ? "self"
+          : isModerator(user)
+            ? "moderators"
+            : myClan && clan === myClan
+              ? "clan"
+              : "players";
       result[group].push(user);
     }
     for (const list of Object.values(result)) list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }));
     return result;
-    // `version` stands for the contents of the users map, which is mutated in place.
-  }, [conversation, version, filter, self]);
+    // profileVersion: clans arrive after the names do.
+  }, [online, filter, self, myClan, profileVersion]);
 
-  const total = conversation.users.size;
-  const shown = groups.self.length + groups.moderators.length + groups.players.length;
+  const total = online.length;
+  const shown = groups.self.length + groups.moderators.length + groups.clan.length + groups.players.length;
 
   return (
-    <div className="chat-roster surface-panel">
+    <div className="chat-roster surface-panel" id="chat-roster">
       <div className="chat-roster-search">
         <label className="chat-roster-search-field">
           <Icon name="search" size={14} />
           <input
             type="search"
             value={filter}
-            placeholder={`${total} ${total === 1 ? "user" : "users"}, type to filter`}
-            aria-label={`Filter the ${total} people in ${conversation.name}`}
+            placeholder={conversation.presenceKnown ? `${total} online, type to filter` : "Type to filter"}
+            aria-label={`Filter the people online in ${conversation.name}`}
             onChange={(event) => setFilter(event.target.value)}
           />
         </label>
       </div>
       <div className="chat-roster-list">
-        {shown === 0 && total > 0 ? (
+        {!conversation.presenceKnown ? (
+          <p className="muted chat-empty">Checking who is online…</p>
+        ) : shown === 0 && total > 0 ? (
           <p className="muted chat-empty">No user matches "{filter.trim()}".</p>
         ) : (
           <ul className="chat-roster-virtual-window">
@@ -326,25 +379,9 @@ const Roster = memo(function Roster({
                     </h3>
                   </li>
                   {!collapsed[group] &&
-                    groups[group].map((user) => {
-                      const style = nameStyle(user.name, user, self);
-                      return (
-                        <li key={user.name} className="chat-roster-item">
-                          <div className="chat-roster-user">
-                            <button
-                              type="button"
-                              className="chat-roster-identity"
-                              title={group === "self" ? undefined : `Message ${user.name}`}
-                              onClick={() => group !== "self" && onOpen(user.name)}
-                            >
-                              <span className={style ? "chat-nick" : "chat-nick is-monochrome"} style={style}>
-                                {user.name}
-                              </span>
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
+                    groups[group].map((user) => (
+                      <RosterRow key={user.name} user={user} group={group} self={self} profile={profiles.get(user.name)} onOpen={onOpen} />
+                    ))}
                 </Fragment>
               ),
             )}
@@ -354,6 +391,91 @@ const Roster = memo(function Roster({
     </div>
   );
 });
+
+// ---- dragging the people list wider
+
+const ROSTER_MIN_WIDTH = 200;
+const ROSTER_MAX_WIDTH = 600;
+const ROSTER_DEFAULT_WIDTH = 280;
+const ROSTER_WIDTH_KEY = "faf-web.chat.rosterWidth";
+const clampWidth = (width: number) => Math.min(ROSTER_MAX_WIDTH, Math.max(ROSTER_MIN_WIDTH, Math.round(width)));
+
+function savedRosterWidth(): number {
+  try {
+    const value = Number(window.localStorage.getItem(ROSTER_WIDTH_KEY));
+    return value ? clampWidth(value) : ROSTER_DEFAULT_WIDTH;
+  } catch {
+    return ROSTER_DEFAULT_WIDTH;
+  }
+}
+
+function saveRosterWidth(width: number) {
+  try {
+    window.localStorage.setItem(ROSTER_WIDTH_KEY, String(width));
+  } catch {
+    // Not kept: the default next time.
+  }
+}
+
+/** The Rust client's handle (features/chat/roster/RosterResizeHandle.tsx): drag, or arrow keys. */
+function RosterResizeHandle({ width, onResize }: { width: number; onResize: (width: number) => void }) {
+  const [drag, setDrag] = useState<{ startX: number; startWidth: number } | null>(null);
+  const latest = useRef(width);
+  latest.current = width;
+
+  useEffect(() => {
+    if (!drag) return;
+    const move = (event: PointerEvent) => onResize(clampWidth(drag.startWidth + drag.startX - event.clientX));
+    const stop = () => {
+      setDrag(null);
+      saveRosterWidth(latest.current);
+    };
+    document.documentElement.classList.add("is-resizing-chat-roster");
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    return () => {
+      document.documentElement.classList.remove("is-resizing-chat-roster");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+  }, [drag, onResize]);
+
+  return (
+    <div
+      className={`chat-roster-resizer${drag ? " is-active" : ""}`}
+      role="separator"
+      tabIndex={0}
+      aria-label="Resize the people list"
+      aria-orientation="vertical"
+      aria-valuemin={ROSTER_MIN_WIDTH}
+      aria-valuemax={ROSTER_MAX_WIDTH}
+      aria-valuenow={width}
+      aria-controls="chat-roster"
+      title="Drag to resize"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        setDrag({ startX: event.clientX, startWidth: width });
+      }}
+      onDoubleClick={() => {
+        onResize(ROSTER_DEFAULT_WIDTH);
+        saveRosterWidth(ROSTER_DEFAULT_WIDTH);
+      }}
+      onKeyDown={(event) => {
+        const step = 12;
+        const next =
+          event.key === "ArrowLeft" ? width + step : event.key === "ArrowRight" ? width - step : event.key === "Home" ? ROSTER_MIN_WIDTH : event.key === "End" ? ROSTER_MAX_WIDTH : null;
+        if (next === null) return;
+        event.preventDefault();
+        const clamped = clampWidth(next);
+        onResize(clamped);
+        saveRosterWidth(clamped);
+      }}
+    />
+  );
+}
 
 // ---- channel tabs
 
@@ -543,6 +665,7 @@ export function ChatView() {
   const [callback, setCallback] = useState(() => window.location.pathname === "/auth/callback");
   const [loginError, setLoginError] = useState("");
   const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterWidth, setRosterWidth] = useState(savedRosterWidth);
 
   // Back from FAF's login page.
   useEffect(() => {
@@ -615,6 +738,7 @@ export function ChatView() {
   const connected = client.status === "connected";
   const conversations = client.visibleConversations();
   const self = client.nick || session.user.name;
+  const onlineCount = active ? onlineUsers(active).length : 0;
 
   let context: ReactNode;
   if (!connected) {
@@ -646,15 +770,16 @@ export function ChatView() {
     context = (
       <span className="chat-online-count">
         <Icon name="users" size={14} />
-        <span>
-          {active.users.size} {active.users.size === 1 ? "person" : "people"} online
-        </span>
+        <span>{active.presenceKnown ? `${onlineCount} ${onlineCount === 1 ? "person" : "people"} online` : "Checking who is online…"}</span>
       </span>
     );
   }
 
   return (
-    <div className={`chat${active && !active.channel ? " is-private" : ""}${rosterOpen && active?.channel ? " is-roster-open" : ""}`}>
+    <div
+      className={`chat${active && !active.channel ? " is-private" : ""}${rosterOpen && active?.channel ? " is-roster-open" : ""}`}
+      style={{ "--chat-roster-width": `${rosterWidth}px` } as CSSProperties}
+    >
       <section className="chat-main">
         <ChannelTabs conversations={conversations} active={active?.key ?? ""} />
         <div className="chat-channel-panel">
@@ -664,7 +789,7 @@ export function ChatView() {
             <div className="chat-head-controls">
               {active?.channel && (
                 <button type="button" className="chat-head-button chat-roster-toggle" onClick={() => setRosterOpen(true)}>
-                  <Icon name="users" size={14} /> {active.users.size}
+                  <Icon name="users" size={14} /> {active.presenceKnown ? onlineCount : "…"}
                 </button>
               )}
               <button
@@ -695,6 +820,7 @@ export function ChatView() {
 
       {active?.channel && (
         <div className="chat-roster-shell">
+          <RosterResizeHandle width={rosterWidth} onResize={setRosterWidth} />
           <button type="button" className="chat-head-button chat-roster-toggle chat-roster-back" onClick={() => setRosterOpen(false)}>
             <Icon name="arrowLeft" size={14} /> Back to {active.name}
           </button>
