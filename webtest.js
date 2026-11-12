@@ -564,8 +564,9 @@ async function testServer() {
     const missingAsset = await request(s.port, '/nope.css');
     eq(missingAsset.status, 404, 'server: a missing asset is a 404, not the shell');
 
-    const cssHref = (index.body.match(/href="(\/assets\/[^"]+\.css)"/) || [])[1];
+    const cssHref = (index.body.match(/href="(\/assets\/[^"?]+\.css(?:\?v=[0-9a-f]+)?)"/) || [])[1];
     ok(Boolean(cssHref), 'server: the shell links the built stylesheet', cssHref);
+    ok(/\?v=[0-9a-f]{10}$/.test(cssHref || ''), 'server: the stylesheet link carries its version, so no cache pairs old files with a new page', cssHref);
     const css = await request(s.port, cssHref || '/missing.css');
     eq(css.status, 200, 'server: the stylesheet is served');
     ok(/text\/css/.test(css.headers['content-type']), 'server: the stylesheet has the right type');

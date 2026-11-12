@@ -124,7 +124,9 @@ export function EmbedView({ title, description, url }: { title: string; descript
           </a>
         }
       />
-      <iframe className="web-embed" src={url} title={title} loading="lazy" referrerPolicy="no-referrer" />
+      {/* Not lazy: the frame is the whole tab, and a browser that judged it
+          off screen while the layout settled left it empty (Opera on Android). */}
+      <iframe className="web-embed" src={url} title={title} referrerPolicy="no-referrer" />
     </div>
   );
 }

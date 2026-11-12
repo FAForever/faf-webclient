@@ -563,21 +563,28 @@ body {
   }
 
   /* A framed site gets everything under the top bar: no header (the top bar
-     names the tab and links to the site), no padding, no border. */
+     names the tab and links to the site), no padding, no border. Pinned to
+     the edges of the content area rather than sized through a chain of
+     percentage heights, which not every phone browser resolves the same. */
+  .web-shell .content.content-tab-units,
+  .web-shell .content.content-tab-daily {
+    position: relative;
+  }
+
   .web-shell .content-inner.content-units,
   .web-shell .content-inner.content-daily {
     padding: 0;
-  }
-
-  .web-view-embed {
-    gap: 0;
   }
 
   .web-view-embed .web-view-header {
     display: none;
   }
 
-  .web-embed {
+  .web-view-embed .web-embed {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     border: 0;
     border-radius: 0;
   }
