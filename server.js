@@ -116,7 +116,7 @@ function securityHeaders() {
   return {
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    // The app embeds three upstream pages (news, changelog, unit db) in
+    // The app embeds upstream pages (news, changelog, unit db, FAF Daily) in
     // iframes, so frame-src has to name them. Everything else is same-origin.
     // The unit db moved from faforever.github.io/etfreeman-db to its own
     // domain in November 2026; the old address redirects there.
@@ -125,9 +125,9 @@ function securityHeaders() {
       // FAF's content server (maps, mods, avatars), the news hub's pictures
       // (WordPress) and the patch notes' unit icons.
       "img-src 'self' " + fafUrl('content') + " https://direct.faforever.com https://faforever.github.io data:",
-      // News is FAF's own site, so it follows the base domain; the changelog
-      // and unit db exist only once.
-      "frame-src " + fafUrl('www') + " https://faforever.github.io https://unitdb.faforever.com https://www.youtube-nocookie.com",
+      // News and FAF Daily are FAF's own sites, so they follow the base
+      // domain; the changelog and unit db exist only once.
+      "frame-src " + fafUrl('www') + " " + fafUrl('daily') + " https://faforever.github.io https://unitdb.faforever.com https://www.youtube-nocookie.com",
       // The Chat tab talks to FAF's chat server directly over a WebSocket;
       // the PC link is a WebSocket to this site ('self' covers it in current
       // browsers, the explicit address covers the rest).

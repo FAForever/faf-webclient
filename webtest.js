@@ -575,6 +575,7 @@ async function testServer() {
     ok(/script-src 'self'/.test(csp), 'server: CSP restricts scripts to this origin');
     ok(/frame-src[^;]*faforever\.github\.io/.test(csp), 'server: CSP allows the embedded FAF pages');
     ok(/frame-src[^;]*https:\/\/unitdb\.faforever\.com/.test(csp), 'server: CSP allows the unit database');
+    ok(/frame-src[^;]*https:\/\/daily\.faforever\.com/.test(csp), 'server: CSP allows FAF Daily');
     ok(!/frame-src[^;]*\*/.test(csp), 'server: CSP does not allow framing anything');
     ok(/connect-src 'self' wss:\/\/chat\.faforever\.com wss:\/\/webclient\.faforever\.com(;|$)/.test(csp), 'server: CSP lets the page reach FAF chat and its own PC link, nothing else');
     eq(index.headers['x-content-type-options'], 'nosniff', 'server: nosniff is set');

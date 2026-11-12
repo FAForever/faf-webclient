@@ -2,7 +2,7 @@
 
 FAF's web client at **webclient.faforever.com**, in the design of the FAF Rust client and usable on phones. Everything is view-only and needs no account, except the Chat tab and "Your PC" on the Play tab, which need a FAF login.
 
-Tabs: News, Chat, Play (open lobbies), Replays, Maps, Mods, Leaderboard, Tournaments, Events, Changelog, Units, Links.
+Tabs: News, Chat, Play (open lobbies), Replays, Maps, Mods, Leaderboard, Tournaments, Events, Changelog, Units, FAF Daily, Links.
 
 ## How it works
 
@@ -22,7 +22,7 @@ browser  ──►  webclient /api/link  ◄──  FAF Rust client on the playe
 - Events: the community catalogue (`FAForeverRustClient/events`, `calendar.json`, weekly and monthly repeats expanded), tournaments, and released patches, in the visitor's time zone, as in the Rust client. An entry can be saved to the visitor's calendar app as an `.ics` file.
 - Changelog: the patch list from the changelog page and each patch's Markdown, read the way the Rust client reads them (unit icons, `old -> new` changes, issue links). `/changelog/<patch>` links straight to a patch. The changelog page is third-party HTML, so the server hands it to the browser as `text/plain` and it is only ever parsed, never shown.
 - Maps and Mods: a card opens its details: the large picture, facts, description, every version with its download, and the reviews (`/data/{map|mod}/{id}/versions?include=reviews,reviews.player`, as the Rust client reads them). "Replays on this map" opens the Replays tab searched by the map's name (`/replays?map=<name>`).
-- Units is FAF's unit database, shown in a frame.
+- Units is FAF's unit database, and FAF Daily (`daily.<base domain>`, FAForever/daily) the daily unit guessing game, both shown in a frame.
 
 - The website runs entirely in the visitor's browser.
 - `server.js` serves the built site from `public/` and proxies a fixed allowlist of read-only upstreams (`lib/upstreams.js`).

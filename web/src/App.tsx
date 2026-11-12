@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Icon, type IconName } from "./ds/Icon";
+import { fafUrl } from "./hosts";
 import { go } from "./nav";
 import { ChangelogView } from "./changelog/ChangelogView";
 import { EventsView } from "./events/EventsView";
@@ -39,6 +40,14 @@ const TABS: TabDef[] = [
     label: "Units",
     icon: "units",
     Component: () => <EmbedView title="Units" description="Stats for every unit." url="https://unitdb.faforever.com/" />,
+  },
+  {
+    id: "daily",
+    label: "FAF Daily",
+    icon: "gamepad",
+    // FAF's own daily unit guessing game, framed like Units. Same site as this
+    // one (faforever.com), so its saved progress is the same as on the site itself.
+    Component: () => <EmbedView title="FAF Daily" description="Guess the daily unit." url={`${fafUrl("daily")}/`} />,
   },
   { id: "links", label: "Links", icon: "external", Component: LinksView, bottom: true },
 ];
