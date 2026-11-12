@@ -99,6 +99,6 @@ With `AUTO_UPDATE=1`, the site redeploys itself within a minute of a push to `ma
 
 ## Credits and licences
 
-- `web/src/ds/` and `web/public/fonts`, `web/public/assets/faflogo.svg` come from the [FAF Rust client](https://github.com/FAForeverRustClient/FAForeverRustClient) at commit `ed3121e9` (MIT).
+- `web/src/ds/`, `web/public/fonts`, `web/public/assets/faflogo.svg` and `mapgen-placeholder.png` (scaled down), and the layouts and styles of the Events, Changelog and Replays tabs come from the [FAF Rust client](https://github.com/FAForeverRustClient/FAForeverRustClient) at commit `ed3121e9` (MIT).
 - Geist and Geist Mono fonts: Vercel, SIL Open Font License 1.1.
 - The server and proxy come from the earlier faf-web by Nuggets (MIT).

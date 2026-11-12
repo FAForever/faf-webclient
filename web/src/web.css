@@ -108,49 +108,10 @@ body {
   flex: 1 1 220px;
 }
 
-.web-replay-search {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-2);
-  max-width: 560px;
-}
-
-.web-replay-search .web-search {
-  flex: 1 1 auto;
-  max-width: none;
-}
-
-.web-replay-search .web-button {
-  white-space: nowrap;
-}
-
 .web-button.is-active {
   color: var(--color-text);
   background: var(--color-accent-glow);
   border-color: var(--color-accent);
-}
-
-.web-replay-id {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  max-width: 560px;
-}
-
-.web-replay-id label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.web-replay-id label .muted {
-  font-size: 0.85rem;
-}
-
-.web-replay-id-row {
-  display: flex;
-  gap: var(--space-2);
 }
 
 .web-input {

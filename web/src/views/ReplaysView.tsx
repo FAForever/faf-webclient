@@ -1,126 +1,15 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { fafPath, mapPreviewUrl, pick, related, type JsonApiDocument, type JsonApiResource } from "../api";
+import { fafPath, type JsonApiDocument } from "../api";
 import { beginLogin, getSession, siteConfig, subscribeSession } from "../auth";
 import { EmptyState } from "../ds/EmptyState";
 import { Icon } from "../ds/Icon";
 import { fafUrl } from "../hosts";
+import { ReplayCard, type ReplayPlayer } from "../replays/ReplayCard";
+import "../replays/replays.css";
 import { LoadFailed, Loading, useJson, ViewHeader } from "./common";
+import { PlayerCard } from "./PlayerCard";
 
-const PAGE_SIZE = 20;
-
-// gamePlayerStats.faction, as the Rust client maps it (faf-domain protocol/replay_query.rs).
-const FACTIONS: Record<string, string> = { "1": "UEF", "2": "Aeon", "3": "Cybran", "4": "Seraphim", "5": "Nomad" };
-
-function factionName(value: unknown): string | null {
-  if (value == null) return null;
-  const text = String(value);
-  if (FACTIONS[text]) return FACTIONS[text];
-  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-}
-
-function duration(start: unknown, end: unknown): string | null {
-  if (typeof start !== "string" || typeof end !== "string") return null;
-  const minutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
-  if (!Number.isFinite(minutes) || minutes < 0) return null;
-  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
-}
-
-function whenPlayed(value: unknown): string {
-  if (typeof value !== "string") return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-}
-
-/** Displayed rating before the game: mean - 3 * deviation, as FAF shows it. */
-function shownRating(stats: Record<string, unknown>): number | null {
-  const mean = pick<number>(stats, "beforeMean");
-  const deviation = pick<number>(stats, "beforeDeviation");
-  if (typeof mean !== "number" || typeof deviation !== "number") return null;
-  return Math.round(mean - 3 * deviation);
-}
-
-function teamsOf(doc: JsonApiDocument, game: JsonApiResource) {
-  const refs = game.relationships?.playerStats?.data;
-  const stats = (Array.isArray(refs) ? refs : [])
-    .map((ref) => doc.included?.find((item) => item.type === ref.type && item.id === ref.id))
-    .filter((item): item is JsonApiResource => Boolean(item));
-
-  const teams = new Map<number, { name: string; faction: string | null; rating: number | null }[]>();
-  for (const stat of stats) {
-    const a = stat.attributes ?? {};
-    const player = related(doc, stat, "player");
-    const team = Number(pick(a, "team") ?? 1);
-    const list = teams.get(team) ?? [];
-    list.push({
-      name: pick<string>(player?.attributes, "login") ?? "unknown",
-      faction: factionName(pick(a, "faction")),
-      rating: shownRating(a),
-    });
-    teams.set(team, list);
-  }
-  return [...teams.entries()].sort(([a], [b]) => a - b);
-}
-
-function ReplayCard({ doc, game }: { doc: JsonApiDocument; game: JsonApiResource }) {
-  const a = game.attributes ?? {};
-  const mapVersion = related(doc, game, "mapVersion");
-  const map = mapVersion ? related(doc, mapVersion, "map") : undefined;
-  const mod = related(doc, game, "featuredMod");
-  const folder = pick<string>(mapVersion?.attributes, "folderName");
-  const length = duration(pick(a, "startTime"), pick(a, "endTime"));
-  const available = pick<boolean>(a, "replayAvailable") !== false;
-  const modName = pick<string>(mod?.attributes, "technicalName");
-
-  return (
-    <article className="web-card web-lobby">
-      {folder ? (
-        <img
-          className="web-lobby-preview"
-          src={mapPreviewUrl(folder)}
-          alt=""
-          loading="lazy"
-          onError={(event) => event.currentTarget.classList.add("is-missing")}
-        />
-      ) : (
-        <div className="web-lobby-preview is-missing" />
-      )}
-      <div className="web-lobby-body">
-        <h2 className="web-card-title">{pick<string>(a, "name") ?? `Game ${game.id}`}</h2>
-        <p className="muted web-lobby-map">{pick<string>(map?.attributes, "displayName") ?? folder ?? "-"}</p>
-        <div className="web-chips">
-          <span className="web-chip">{whenPlayed(pick(a, "endTime", "startTime"))}</span>
-          {length && <span className="web-chip">{length}</span>}
-          {modName && modName !== "faf" && <span className="web-chip">{modName}</span>}
-          {pick<string>(a, "validity") && pick<string>(a, "validity") !== "VALID" && <span className="web-chip">Unranked</span>}
-        </div>
-        <ul className="web-teams">
-          {teamsOf(doc, game).map(([team, players]) => (
-            <li key={team}>
-              <span className="web-team-label">{team <= 1 ? "No team" : `Team ${team - 1}`}</span>
-              {players
-                .map((p) => {
-                  const extra = [p.faction, p.rating != null ? String(p.rating) : null].filter(Boolean).join(", ");
-                  return extra ? `${p.name} (${extra})` : p.name;
-                })
-                .join(" · ")}
-            </li>
-          ))}
-        </ul>
-        <div className="web-card-actions">
-          <span className="muted">#{game.id}</span>
-          {available ? (
-            <a className="web-button" href={`${fafUrl("replay")}/${encodeURIComponent(game.id)}`} rel="noopener noreferrer">
-              Download replay
-            </a>
-          ) : (
-            <span className="muted">No replay file</span>
-          )}
-        </div>
-      </div>
-    </article>
-  );
-}
+const PAGE_SIZE = 24;
 
 /**
  * The replay ID in whatever was typed or pasted: "25001234", "#25001234", or a
@@ -143,28 +32,27 @@ function DownloadById() {
 
   return (
     <form
-      className="web-card web-replay-id"
+      className="replay-filter replay-filter-id"
       onSubmit={(event) => {
         event.preventDefault();
         if (href) window.location.href = href;
       }}
     >
-      <label htmlFor="replay-id">
-        <strong>Download by replay ID</strong>
-        <span className="muted">The number shown on the replay, e.g. 25001234. A replay link works too.</span>
+      <label className="replay-filter-label" htmlFor="replay-id">
+        Replay ID
       </label>
-      <div className="web-replay-id-row">
+      <div className="replay-filter-row">
         <input
           id="replay-id"
           className="web-input"
           inputMode="numeric"
           autoComplete="off"
-          placeholder="Replay ID"
+          placeholder="25001234 or a replay link"
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
         <a
-          className={`web-button web-button-primary${href ? "" : " is-disabled"}`}
+          className={`web-button${href ? " web-button-primary" : " is-disabled"}`}
           href={href}
           aria-disabled={!href}
           rel="noopener noreferrer"
@@ -198,6 +86,7 @@ export function ReplaysView() {
   const me = session?.user.name ?? "";
   const [canLogin, setCanLogin] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [openPlayer, setOpenPlayer] = useState<ReplayPlayer | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -209,6 +98,19 @@ export function ReplaysView() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  // "Recent replays" on a player card opened from this tab: same tab, new player.
+  useEffect(() => {
+    const onPop = () => {
+      if (window.location.pathname !== "/replays") return;
+      const name = playerFromAddress();
+      setTyped(name);
+      setPlayer(name);
+      setPage(1);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   const showing = (name: string) => {
@@ -251,25 +153,37 @@ export function ReplaysView() {
   const games = load.state === "ready" ? load.data.data ?? [] : [];
 
   return (
-    <div className="web-view">
+    <div className="web-view web-view-replays">
       <ViewHeader title="Replays" description="Recently finished games. Download a replay to watch it in the desktop client." />
-      <DownloadById />
-      <div className="web-replay-search">
-        <label className="web-search">
-          <Icon name="search" size={16} />
-          <input type="search" placeholder="Player name (exact)" value={typed} onChange={(event) => setTyped(event.target.value)} />
-        </label>
-        {(me || canLogin) && (
-          <button
-            type="button"
-            className={`web-button${mine ? " is-active" : ""}`}
-            aria-pressed={mine}
-            onClick={onMine}
-            title={me ? `Games played by ${me}` : "Log in with your FAF account to see your own games"}
-          >
-            <Icon name="user" size={14} /> My replays
-          </button>
-        )}
+      <div className="replay-filters surface-panel">
+        <div className="replay-filter replay-filter-player">
+          <label className="replay-filter-label" htmlFor="replay-player">
+            Player
+          </label>
+          <div className="replay-filter-row">
+            <input
+              id="replay-player"
+              className="web-input"
+              type="search"
+              placeholder="Exact player name"
+              autoComplete="off"
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+            />
+            {(me || canLogin) && (
+              <button
+                type="button"
+                className={`web-button${mine ? " is-active" : ""}`}
+                aria-pressed={mine}
+                onClick={onMine}
+                title={me ? `Games played by ${me}` : "Log in with your FAF account to see your own games"}
+              >
+                <Icon name="user" size={14} /> My replays
+              </button>
+            )}
+          </div>
+        </div>
+        <DownloadById />
       </div>
       {loginError && <p className="muted">{loginError}</p>}
 
@@ -280,9 +194,9 @@ export function ReplaysView() {
           <EmptyState icon="replays" title="No replays found" hint={player ? `No finished games for "${player}".` : undefined} bordered />
         ) : (
           <>
-            <div className="web-grid">
+            <div className="replay-grid">
               {games.map((game) => (
-                <ReplayCard key={game.id} doc={load.data} game={game} />
+                <ReplayCard key={game.id} doc={load.data} game={game} me={me} onPlayer={setOpenPlayer} />
               ))}
             </div>
             <div className="web-pager">
@@ -296,6 +210,7 @@ export function ReplaysView() {
             </div>
           </>
         ))}
+      {openPlayer?.id && <PlayerCard id={openPlayer.id} name={openPlayer.name} onClose={() => setOpenPlayer(null)} />}
     </div>
   );
 }

@@ -1,0 +1,394 @@
+/* The Replays tab: the filter panel and the replay cards, from the Rust
+   client's online-replays.css (replay-card, replay-meta, replay-player),
+   with a phone layout added at the end. */
+
+.web-view.web-view-replays {
+  max-width: none;
+}
+
+/* ---- filters: labelled fields in one panel, as the Rust client's vault --- */
+
+.replay-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+}
+
+.replay-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.replay-filter-player {
+  flex: 2 1 340px;
+  max-width: 560px;
+}
+
+.replay-filter-id {
+  flex: 1 1 300px;
+  max-width: 420px;
+}
+
+.replay-filter-label {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.replay-filter-row {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.replay-filter-row .web-button {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ---- the cards ------------------------------------------------------------ */
+
+.replay-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(500px, 100%), 1fr));
+  gap: 10px;
+}
+
+.replay-card {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 200px;
+  padding: var(--space-3);
+  transition: border-color 120ms ease;
+}
+
+.replay-card:hover {
+  border-color: var(--color-border-strong);
+}
+
+/* Wider than the 128px thumbnail it centres: the facts under it are two
+   columns, each with an icon. */
+.replay-card-left {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  width: 158px;
+}
+
+.replay-card-thumb {
+  display: block;
+  flex: none;
+  width: 128px;
+  height: 128px;
+  object-fit: cover;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-md);
+}
+
+.replay-card-thumb-empty {
+  display: grid;
+  place-items: center;
+  color: var(--color-muted);
+}
+
+.replay-meta-grid {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 6px 10px;
+  width: 100%;
+  font-size: 11px;
+}
+
+.replay-meta-fact {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.replay-meta-fact > svg {
+  flex: 0 0 auto;
+  opacity: 0.75;
+}
+
+.replay-meta-fact > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replay-card-right {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.replay-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-bottom: var(--space-3);
+}
+
+.replay-card-header {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.replay-card-corner {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+}
+
+.replay-card-title {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replay-card-submap {
+  display: block;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replay-card-id {
+  font-variant-numeric: tabular-nums;
+}
+
+.web-button.replay-card-watch {
+  min-height: 36px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.replay-card-teams {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  align-content: start;
+  gap: var(--space-2) var(--space-3);
+}
+
+.replay-card-teams[data-sole-team="true"] {
+  grid-template-columns: 1fr;
+}
+
+.replay-card-team {
+  min-width: 0;
+}
+
+.replay-card-team-title {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 4px;
+  padding-bottom: 4px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.replay-card-team-title > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replay-card-team-title > span:last-child {
+  flex: none;
+}
+
+.replay-card-team-roster {
+  display: flex;
+  flex-direction: column;
+}
+
+.replay-card-team-roster.is-split {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-3);
+}
+
+.replay-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: 22px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.replay-player-identity {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.replay-player-link {
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.replay-player-link:hover .replay-player-name-text {
+  text-decoration: underline;
+}
+
+.replay-player-link:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.replay-player-faction-empty {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.replay-player-name-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The logged-in player, in the gold the Rust client gives your own name. */
+.replay-player.is-self .replay-player-name-text {
+  color: var(--color-faction-seraphim);
+  font-weight: 600;
+}
+
+.replay-card-player-stats {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.replay-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: var(--space-1);
+  font-size: 11px;
+}
+
+/* ---- a phone: the map and title in one row, the lineup under them at full
+   width, the facts at the bottom. ---------------------------------------- */
+
+@media (max-width: 560px) {
+  .replay-filter-player,
+  .replay-filter-id {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .replay-filters {
+    padding: var(--space-3);
+  }
+
+  .replay-card {
+    display: grid;
+    grid-template-areas:
+      "thumb top"
+      "teams teams"
+      "meta meta"
+      "footer footer";
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+    min-height: 0;
+  }
+
+  .replay-card-left,
+  .replay-card-right {
+    display: contents;
+  }
+
+  .replay-card-thumb {
+    grid-area: thumb;
+    width: 72px;
+    height: 72px;
+  }
+
+  .replay-card-top {
+    grid-area: top;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-bottom: 0;
+  }
+
+  .replay-card-header {
+    width: 100%;
+  }
+
+  .replay-card-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+
+  .web-button.replay-card-watch {
+    min-height: 32px;
+  }
+
+  .replay-card-teams {
+    grid-area: teams;
+  }
+
+  .replay-player {
+    min-height: 26px;
+    font-size: 14px;
+  }
+
+  .replay-meta-grid {
+    grid-area: meta;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .replay-card-footer {
+    grid-area: footer;
+    justify-content: flex-start;
+  }
+}
