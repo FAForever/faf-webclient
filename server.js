@@ -22,6 +22,11 @@
  * relays the login calls the browser cannot make itself and keeps nothing:
  * the chat connection goes from the browser straight to FAF's chat server.
  *
+ * The PC link (lib/link.js) connects a player's FAF Rust client and their
+ * browser, so the browser can start a matchmaker search on the PC and be told
+ * when a match is found. Messages only pass between one account's own PC and
+ * browsers; nothing is stored. FAF_LINK=off switches it off.
+ *
  * FAF_BASE_DOMAIN (lib/hosts.js) picks FAF's real servers or its test ones.
  *
  * Zero runtime dependencies, no build step. Upload the files, restart the
@@ -39,6 +44,9 @@ const { createTokenSource } = require('./lib/faftoken');
 const { createUserLogin, CHAT_URL } = require('./lib/userlogin');
 const { boardTarget, pageOf, apiTarget, pageFromApi } = require('./lib/leaderboard');
 const { BASE_DOMAIN, IN_CLUSTER, fafUrl, serverUrl } = require('./lib/hosts');
+const { createLink } = require('./lib/link');
+const { createJwtVerifier } = require('./lib/jwt');
+const { createWebPush } = require('./lib/webpush');
 
 const PORT = Number(process.env.PORT || 8098);
 // Auto-update. Off unless AUTO_UPDATE=1, so nothing changes for anyone who
@@ -62,6 +70,27 @@ const loginClientId = process.env.FAF_LOGIN_CLIENT_ID;
 const userLogin = loginClientId === 'off' ? null : createUserLogin(loginClientId ? { clientId: loginClientId } : {});
 const MAX_BODY_BYTES = 8 * 1024;
 let watcher = null;
+
+// The PC link. Needs the chat login (browsers get their link ticket with it).
+// Phone notifications use a key made at start unless FAF_LINK_VAPID_KEY keeps one.
+const LINK_PATH = '/api/link';
+const link = process.env.FAF_LINK === 'off' || !userLogin ? null : createLink({
+  tokens: createJwtVerifier({
+    jwksUrl: serverUrl('hydra') + '/.well-known/jwks.json',
+    issuers: [fafUrl('hydra')]
+  }),
+  clientIds: process.env.FAF_LINK_CLIENT_IDS ? process.env.FAF_LINK_CLIENT_IDS.split(',').map((id) => id.trim()).filter(Boolean) : undefined,
+  secret: process.env.FAF_LINK_SECRET || undefined,
+  push: process.env.FAF_LINK_PUSH === 'off' ? null : createWebPush({
+    subject: fafUrl('webclient'),
+    privateKeyPem: process.env.FAF_LINK_VAPID_KEY || undefined
+  }),
+  // Same origin only: the page that asks must be this site.
+  allowedOrigin: (origin, req) => {
+    try { return Boolean(origin) && new URL(origin).host === req.headers.host; } catch (_) { return false; }
+  },
+  log: (level, msg, extra) => log(level, msg, extra)
+});
 
 /* ------------------------------------------------------------------ logging */
 
@@ -99,8 +128,10 @@ function securityHeaders() {
       // News is FAF's own site, so it follows the base domain; the changelog
       // and unit db exist only once.
       "frame-src " + fafUrl('www') + " https://faforever.github.io https://unitdb.faforever.com https://www.youtube-nocookie.com",
-      // The Chat tab talks to FAF's chat server directly over a WebSocket.
-      "connect-src 'self' " + CHAT_URL,
+      // The Chat tab talks to FAF's chat server directly over a WebSocket;
+      // the PC link is a WebSocket to this site ('self' covers it in current
+      // browsers, the explicit address covers the rest).
+      "connect-src 'self' " + CHAT_URL + ' ' + fafUrl('webclient', 'wss'),
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self'",
       "base-uri 'none'",
@@ -119,7 +150,15 @@ async function handleApi(req, res, url) {
   if (url.pathname === '/api/config' && req.method === 'GET') {
     // The site needs the base domain for its own links (map previews,
     // replay downloads, news).
-    sendJson(res, 200, Object.assign({ baseDomain: BASE_DOMAIN }, userLogin ? userLogin.config() : { login: null, chat: null }));
+    sendJson(res, 200, Object.assign(
+      { baseDomain: BASE_DOMAIN },
+      userLogin ? userLogin.config() : { login: null, chat: null },
+      { link: link ? { path: LINK_PATH, pushKey: link.pushKey } : null }
+    ));
+    return;
+  }
+  if (url.pathname === LINK_PATH + '/push') {
+    await handleLinkPush(req, res);
     return;
   }
   if (req.method !== 'GET') {
@@ -317,6 +356,8 @@ async function handleAuth(req, res, action) {
       return;
     }
     const session = await userLogin[action](body);
+    // The browser's pass to the PC link, renewed with every chat token.
+    if (link && session.user && /^\d+$/.test(session.user.id)) session.linkTicket = link.issueTicket(session.user);
     sendJson(res, 200, session);
     log('info', 'auth', { action, ok: true, ms: Date.now() - t0 });
   } catch (err) {
@@ -325,6 +366,23 @@ async function handleAuth(req, res, action) {
     log(status >= 500 ? 'error' : 'warn', 'auth', { action, ok: false, status, code, ms: Date.now() - t0 });
     sendJson(res, status, { error: status >= 500 && !err.code ? 'internal error' : err.message, code });
   }
+}
+
+/** POST /api/link/push: the browser's push subscription for match-found notifications. */
+async function handleLinkPush(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    sendJson(res, 405, { error: 'use POST' });
+    return;
+  }
+  if (!link) {
+    sendJson(res, 503, { error: 'the PC link is switched off on this server', code: 'link-off' });
+    return;
+  }
+  const body = await readJsonBody(req, res);
+  if (!body) return;
+  const result = link.setPush(body);
+  sendJson(res, result.status, result.body);
 }
 
 function handleStatic(req, res, url) {
@@ -381,6 +439,7 @@ const server = http.createServer((req, res) => {
       playTab: true,
       serviceLogin: Boolean(serviceLogin),
       chatLogin: Boolean(userLogin),
+      link: link ? link.stats() : { enabled: false },
       autoUpdate: watcher ? watcher.status() : { enabled: false }
     });
     return;
@@ -395,6 +454,18 @@ const server = http.createServer((req, res) => {
   }
 
   handleStatic(req, res, url);
+});
+
+// The PC link's WebSockets. Anything else asking to upgrade is refused.
+server.on('upgrade', (req, socket, head) => {
+  let pathname = '';
+  try { pathname = new URL(req.url || '/', 'http://localhost').pathname; } catch (_) { /* refused below */ }
+  if (link && pathname === LINK_PATH) {
+    link.handleUpgrade(req, socket, head);
+    return;
+  }
+  socket.write('HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+  socket.destroy();
 });
 
 server.requestTimeout = 30_000;
@@ -436,4 +507,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { server };
+module.exports = { server, link };

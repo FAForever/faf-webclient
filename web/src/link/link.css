@@ -1,0 +1,388 @@
+/* "Your PC" on the Play tab, the lobby Join buttons, and the match-found
+   banner. Bundled before web.css: anything that overrides a web-* rule
+   carries a second class. */
+
+.web-card.pc-panel {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-4);
+  overflow: visible;
+}
+
+.pc-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.pc-panel:not(.is-closed) .pc-head {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.pc-head .web-card-title {
+  flex: 1;
+}
+
+.pc-pill {
+  padding: 2px 10px;
+  overflow: hidden;
+  max-width: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-muted);
+}
+
+.pc-pill.is-ok {
+  color: var(--color-ok-text);
+  border-color: color-mix(in srgb, var(--color-ok) 45%, transparent);
+}
+
+.pc-pill.is-warn {
+  color: var(--color-warn-text);
+}
+
+.pc-body {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.pc-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(220px, 2fr);
+  gap: var(--space-4);
+}
+
+.pc-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.pc-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pc-section-title .muted {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.pc-queues {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
+}
+
+.pc-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.pc-queue:hover:not(:disabled) {
+  border-color: var(--color-border-strong);
+}
+
+.pc-queue.is-on {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.pc-queue:disabled {
+  cursor: default;
+}
+
+.pc-queue:disabled:not(.is-on) {
+  opacity: 0.5;
+}
+
+.pc-queue-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 650;
+}
+
+.pc-queue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+}
+
+.pc-queue-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 10px 12px;
+  font-weight: 600;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-md);
+}
+
+.pc-status.is-idle {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.pc-status.is-found {
+  color: var(--color-accent-contrast);
+  background: var(--color-ok);
+}
+
+.pc-spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: pc-spin 0.9s linear infinite;
+}
+
+@keyframes pc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-spinner {
+    animation: none;
+  }
+}
+
+.pc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.pc-notify {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pc-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pc-check input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+
+.pc-note,
+.pc-empty p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.pc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.pc-problem {
+  margin: 0;
+  color: var(--color-warn-text);
+  font-size: 13px;
+}
+
+.pc-friends {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pc-friend {
+  display: grid;
+  grid-template-columns: 8px minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  font-size: 13px;
+}
+
+.pc-friend-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--color-border-strong);
+  border-radius: 50%;
+}
+
+.pc-friend.is-online .pc-friend-dot {
+  background: var(--color-ok);
+}
+
+.pc-friend.is-busy .pc-friend-dot {
+  background: var(--color-warn);
+}
+
+.pc-friend-name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-friend:not(.is-online) .pc-friend-name {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.pc-friend-status {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.web-button.pc-more {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* The Join button on a lobby card, when the PC is connected. */
+.web-lobby-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.web-button.web-lobby-join {
+  min-height: 32px;
+}
+
+.web-lobby-source {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+}
+
+/* The password prompt. */
+.pc-join-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.pc-join-form h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.pc-join-form .web-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.pc-join-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* "Match found", over whatever tab is open. */
+.match-banner {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: min(560px, calc(100% - 24px));
+  padding: 12px 12px 12px 16px;
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+  background: var(--color-ok);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.45);
+  transform: translateX(-50%);
+}
+
+.match-banner > span {
+  flex: 1;
+}
+
+.web-icon-button.match-banner-close {
+  color: inherit;
+}
+
+@media (max-width: 760px) {
+  .pc-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pc-head,
+  .pc-body {
+    padding-right: var(--space-3);
+    padding-left: var(--space-3);
+  }
+
+  .pc-queues {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pc-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pc-actions .web-button {
+    justify-content: center;
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .pc-check {
+    font-size: 14px;
+  }
+
+  .pc-friend {
+    min-height: 34px;
+    font-size: 14px;
+  }
+}

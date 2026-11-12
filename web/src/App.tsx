@@ -3,6 +3,7 @@ import { Icon, type IconName } from "./ds/Icon";
 import { go } from "./nav";
 import { ChangelogView } from "./changelog/ChangelogView";
 import { EventsView } from "./events/EventsView";
+import { MatchBanner } from "./link/MatchBanner";
 import { NewsView } from "./news/NewsView";
 import { ChatView } from "./views/ChatView";
 import { ErrorBoundary } from "./views/ErrorBoundary";
@@ -124,6 +125,8 @@ export function App() {
           <div className="nav-group">{TABS.filter((t) => t.bottom).map(renderTab)}</div>
         </nav>
       </aside>
+
+      <MatchBanner />
 
       <main className="workspace">
         <section ref={contentRef} className={`content content-tab-${active.id}`} aria-label={active.label} tabIndex={-1}>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fafPath, formatDate, pick, related, type JsonApiDocument, type JsonApiResource } from "../api";
 import { EmptyState } from "../ds/EmptyState";
 import { Icon } from "../ds/Icon";
+import { VaultDetail } from "../vault/VaultDetail";
 import { LoadFailed, Loading, useJson, ViewHeader } from "./common";
 
 const PAGE_SIZE = 40;
@@ -127,7 +128,8 @@ function compact(n: number): string {
   return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n);
 }
 
-function VaultCard({ doc, item, kind }: { doc: JsonApiDocument; item: JsonApiResource; kind: Kind }) {
+/** One map or mod. The whole card opens its details (vault/VaultDetail.tsx). */
+function VaultCard({ doc, item, kind, onOpen }: { doc: JsonApiDocument; item: JsonApiResource; kind: Kind; onOpen: () => void }) {
   const a = item.attributes ?? {};
   const version = related(doc, item, "latestVersion");
   const v = version?.attributes ?? {};
@@ -142,35 +144,38 @@ function VaultCard({ doc, item, kind }: { doc: JsonApiDocument; item: JsonApiRes
   const played = pick<number>(a, "gamesPlayed");
   const type = pick<string>(v, "type");
   const ranked = pick<boolean>(v, "ranked");
+  const name = pick<string>(a, "displayName", "name") ?? "-";
 
   return (
     <article className="web-card web-vault-card">
-      <VaultThumb url={thumb} kind={kind} />
-      <div className="web-vault-body">
-        <h2 className="web-card-title">{pick<string>(a, "displayName", "name") ?? "-"}</h2>
-        <p className="muted">{author ? `by ${author}` : "Author unknown"}</p>
-        <div className="web-chips">
-          {stars && (
-            <span className="web-chip" title="Average review score, out of 5 (reviews)">
-              <Icon name="star" size={12} /> {stars}
-            </span>
-          )}
-          {players != null && (
-            <span className="web-chip" title="Players">
-              <Icon name="users" size={13} /> {players}
-            </span>
-          )}
-          {width != null && <span className="web-chip">{Math.round(width / 51.2)} km</span>}
-          {kind === "map" && typeof played === "number" && played > 0 && (
-            <span className="web-chip" title={`${played} games played`}>
-              <Icon name="play" size={12} /> {compact(played)}
-            </span>
-          )}
-          {type && <span className="web-chip">{type === "SIM" ? "Sim mod" : type === "UI" ? "UI mod" : type}</span>}
-          {ranked === false && <span className="web-chip">Unranked</span>}
-          <span className="web-chip">{formatDate(pick(v, "updateTime", "createTime"))}</span>
+      <button type="button" className="web-vault-open" onClick={onOpen} aria-label={`${name}: details`}>
+        <VaultThumb url={thumb} kind={kind} />
+        <div className="web-vault-body">
+          <h2 className="web-card-title">{name}</h2>
+          <p className="muted">{author ? `by ${author}` : "Author unknown"}</p>
+          <div className="web-chips">
+            {stars && (
+              <span className="web-chip" title="Average review score, out of 5 (reviews)">
+                <Icon name="star" size={12} /> {stars}
+              </span>
+            )}
+            {players != null && (
+              <span className="web-chip" title="Players">
+                <Icon name="users" size={13} /> {players}
+              </span>
+            )}
+            {width != null && <span className="web-chip">{Math.round(width / 51.2)} km</span>}
+            {kind === "map" && typeof played === "number" && played > 0 && (
+              <span className="web-chip" title={`${played} games played`}>
+                <Icon name="play" size={12} /> {compact(played)}
+              </span>
+            )}
+            {type && <span className="web-chip">{type === "SIM" ? "Sim mod" : type === "UI" ? "UI mod" : type}</span>}
+            {ranked === false && <span className="web-chip">Unranked</span>}
+            <span className="web-chip">{formatDate(pick(v, "updateTime", "createTime"))}</span>
+          </div>
         </div>
-      </div>
+      </button>
     </article>
   );
 }
@@ -207,6 +212,8 @@ export function VaultView({ kind }: { kind: Kind }) {
   const [typed, setTyped] = useState({ search: "", author: "" });
   const [filters, setFilters] = useState<Filters>(EMPTY);
   const [page, setPage] = useState(1);
+  // The card's document goes with it: the list may page on underneath.
+  const [open, setOpen] = useState<{ doc: JsonApiDocument; item: JsonApiResource } | null>(null);
 
   // Text fields search after a short pause in typing, not on every key.
   useEffect(() => {
@@ -315,7 +322,7 @@ export function VaultView({ kind }: { kind: Kind }) {
           <>
             <div className="web-grid web-grid-vault">
               {items.map((item) => (
-                <VaultCard key={item.id} doc={load.data} item={item} kind={kind} />
+                <VaultCard key={item.id} doc={load.data} item={item} kind={kind} onOpen={() => setOpen({ doc: load.data, item })} />
               ))}
             </div>
             <div className="web-pager">
@@ -329,6 +336,7 @@ export function VaultView({ kind }: { kind: Kind }) {
             </div>
           </>
         ))}
+      {open && <VaultDetail kind={kind} doc={open.doc} item={open.item} onClose={() => setOpen(null)} />}
     </div>
   );
 }

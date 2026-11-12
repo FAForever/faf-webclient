@@ -29,13 +29,15 @@ function modesFrom(boards: string[]): Mode[] {
 }
 
 /**
- * The search a link asks for: /replays?player=Name from a player card, or
- * /replays?mine=1 on the way back from a login started by "My replays".
+ * The search a link asks for: /replays?player=Name from a player card,
+ * /replays?map=Name from a map's details, or /replays?mine=1 on the way back
+ * from a login started by "My replays".
  */
 function queryFromAddress(): ReplayQuery {
   const params = new URLSearchParams(window.location.search);
   const player = params.has("mine") ? getSession()?.user.name ?? "" : params.get("player")?.slice(0, 40) ?? "";
-  return { ...EMPTY_QUERY, player };
+  const map = params.get("map")?.slice(0, 80) ?? "";
+  return { ...EMPTY_QUERY, player, map };
 }
 
 export function ReplaysView() {

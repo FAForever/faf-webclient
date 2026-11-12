@@ -7,8 +7,9 @@
 // in, a chat token valid for a day, and a refresh token for the next one.
 //
 // What is kept in the browser (localStorage, this site only): the user's name
-// and id, the chat token, and the refresh token. No password ever passes
-// through this site: it is typed on FAF's own login page.
+// and id, the chat token, the refresh token, and the ticket for the PC link
+// (link/link.ts). No password ever passes through this site: it is typed on
+// FAF's own login page.
 
 export interface SessionUser {
   id: string;
@@ -21,6 +22,8 @@ export interface Session {
   /** When the chat token was handed out (ms). FAF's chat tokens live 24 hours. */
   chatTokenAt: number;
   refreshToken: string | null;
+  /** This site's pass to the PC link, handed out with each chat token. */
+  linkTicket?: string;
 }
 
 export interface SiteConfig {
@@ -28,6 +31,8 @@ export interface SiteConfig {
   baseDomain?: string;
   login: { clientId: string; authorizeUrl: string; scope: string; callbackPath: string } | null;
   chat: { url: string; channel: string } | null;
+  /** The PC link (lib/link.js): its WebSocket path and the key push subscriptions are made for. */
+  link?: { path: string; pushKey: string | null } | null;
 }
 
 export class AuthError extends Error {
@@ -184,13 +189,19 @@ async function postAuth(action: "login" | "refresh", body: unknown): Promise<Ses
     throw new AuthError("offline", "This site could not be reached.");
   }
   const data = (await res.json().catch(() => null)) as
-    | { user?: SessionUser; chatToken?: string; refreshToken?: string | null; code?: string; error?: string }
+    | { user?: SessionUser; chatToken?: string; refreshToken?: string | null; linkTicket?: string; code?: string; error?: string }
     | null;
   if (!res.ok || !data || !data.user || typeof data.chatToken !== "string") {
     const code = data?.code ?? "failed";
     throw new AuthError(code, PROBLEMS[code] ?? `Login failed (${res.status}).`);
   }
-  return { user: data.user, chatToken: data.chatToken, chatTokenAt: Date.now(), refreshToken: data.refreshToken ?? null };
+  return {
+    user: data.user,
+    chatToken: data.chatToken,
+    chatTokenAt: Date.now(),
+    refreshToken: data.refreshToken ?? null,
+    linkTicket: typeof data.linkTicket === "string" ? data.linkTicket : undefined,
+  };
 }
 
 /**
@@ -257,6 +268,21 @@ export async function freshChatToken(rejected?: string): Promise<Session> {
   };
   const locks = (navigator as Navigator & { locks?: { request: <T>(name: string, fn: () => Promise<T>) => Promise<T> } }).locks;
   return locks ? locks.request("faf-web-session", run) : run();
+}
+
+/**
+ * A ticket for the PC link. Renewed with the chat token; renewed early when the
+ * server refused `rejected` (it restarted, or the login predates the link).
+ */
+export async function freshLinkTicket(rejected?: string): Promise<string> {
+  let session = await freshChatToken();
+  if (!session.linkTicket || session.linkTicket === rejected) {
+    // Renewing early needs the refresh token; without one, forcing it would log the chat out too.
+    if (!session.refreshToken) throw new AuthError("session-expired", "Log in again to reach your PC.");
+    session = await freshChatToken(session.chatToken);
+  }
+  if (!session.linkTicket) throw new AuthError("link-off", "The PC link is not available on this site.");
+  return session.linkTicket;
 }
 
 /** Forgets the login here and asks FAF to retire the refresh token. */

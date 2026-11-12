@@ -15,12 +15,14 @@ import { chat, type ChatMessage, type ChatUser, type Conversation } from "../cha
 import "../chat/chat.css";
 import { profiles, type Profile } from "../chat/profiles";
 import { Icon } from "../ds/Icon";
+import { useFriendNames } from "../link/link";
 import { ViewHeader } from "./common";
 
 // The Rust client's default name colours (faf-domain settings/chat.rs).
 const SELF_COLOR = "#ffdd00";
 const MODERATOR_COLOR = "#32cd32";
 const ADMIN_COLOR = "#ba55d3";
+const FRIEND_COLOR = "#87cefa";
 const PING_COLOR = "#ff8c00";
 const CONTINUATION_MS = 5 * 60 * 1000;
 const MAX_INPUT = 450;
@@ -28,10 +30,12 @@ const MAX_INPUT = 450;
 const isAdmin = (user?: ChatUser) => !!user && /[~&]/.test(user.prefix);
 const isModerator = (user?: ChatUser) => !!user && /[~&@%]/.test(user.prefix);
 
-function nameStyle(name: string, user: ChatUser | undefined, self: string): CSSProperties | undefined {
+/** `friends`: lower-cased logins, known while the PC link is connected (link/link.ts). */
+function nameStyle(name: string, user: ChatUser | undefined, self: string, friends: ReadonlySet<string>): CSSProperties | undefined {
   if (self && name.toLowerCase() === self.toLowerCase()) return { color: SELF_COLOR };
   if (isAdmin(user)) return { color: ADMIN_COLOR };
   if (isModerator(user)) return { color: MODERATOR_COLOR };
+  if (friends.has(name.toLowerCase())) return { color: FRIEND_COLOR };
   return undefined;
 }
 
@@ -141,6 +145,7 @@ const MessageLog = memo(function MessageLog({
   const scrollRef = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
   const [missed, setMissed] = useState(false);
+  const friends = useFriendNames();
   const messages = conversation.messages;
 
   // A new conversation opens at its latest line.
@@ -180,7 +185,7 @@ const MessageLog = memo(function MessageLog({
             const label = timeLabel(message.time);
             const withTime = newDay || !previous || label !== timeLabel(previous.time);
             const user = users.get(message.sender.toLowerCase());
-            const style = nameStyle(message.sender, user, self);
+            const style = nameStyle(message.sender, user, self, friends);
             const fromSelf = !!self && message.sender.toLowerCase() === self.toLowerCase();
             const nick = (
               <button
@@ -257,16 +262,31 @@ const MessageLog = memo(function MessageLog({
 
 // ---- the people in a channel
 
-type Group = "self" | "moderators" | "clan" | "players";
-const GROUP_LABEL: Record<Group, string> = { self: "You", moderators: "Moderators & admins", clan: "Clan", players: "Players" };
+// The Rust client's order. Friends are known only while the PC link is connected.
+type Group = "self" | "moderators" | "friends" | "clan" | "players";
+const GROUP_LABEL: Record<Group, string> = { self: "You", moderators: "Moderators & admins", friends: "Friends", clan: "Clan", players: "Players" };
 
 /** The people in a channel who are connected right now (see ChatUser.away). */
 export function onlineUsers(conversation: Conversation): ChatUser[] {
   return [...conversation.users.values()].filter((user) => user.away === false);
 }
 
-function RosterRow({ user, group, self, profile, onOpen }: { user: ChatUser; group: Group; self: string; profile: Profile | null | undefined; onOpen: (nick: string) => void }) {
-  const style = nameStyle(user.name, user, self);
+function RosterRow({
+  user,
+  group,
+  self,
+  friends,
+  profile,
+  onOpen,
+}: {
+  user: ChatUser;
+  group: Group;
+  self: string;
+  friends: ReadonlySet<string>;
+  profile: Profile | null | undefined;
+  onOpen: (nick: string) => void;
+}) {
+  const style = nameStyle(user.name, user, self, friends);
   return (
     <li className="chat-roster-item">
       <div className="chat-roster-user">
@@ -305,6 +325,7 @@ const Roster = memo(function Roster({
   const [filter, setFilter] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const profileVersion = useSyncExternalStore(profiles.subscribe, profiles.getVersion);
+  const friends = useFriendNames();
 
   // `version` stands for the contents of the users map, which is mutated in place.
   const online = useMemo(() => onlineUsers(conversation), [conversation, version]);
@@ -318,7 +339,7 @@ const Roster = memo(function Roster({
 
   const groups = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    const result: Record<Group, ChatUser[]> = { self: [], moderators: [], clan: [], players: [] };
+    const result: Record<Group, ChatUser[]> = { self: [], moderators: [], friends: [], clan: [], players: [] };
     for (const user of online) {
       const clan = profiles.get(user.name)?.clan ?? null;
       if (needle && !user.name.toLowerCase().includes(needle) && !(clan && clan.toLowerCase().includes(needle))) continue;
@@ -327,18 +348,20 @@ const Roster = memo(function Roster({
           ? "self"
           : isModerator(user)
             ? "moderators"
-            : myClan && clan === myClan
-              ? "clan"
-              : "players";
+            : friends.has(user.name.toLowerCase())
+              ? "friends"
+              : myClan && clan === myClan
+                ? "clan"
+                : "players";
       result[group].push(user);
     }
     for (const list of Object.values(result)) list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true }));
     return result;
     // profileVersion: clans arrive after the names do.
-  }, [online, filter, self, myClan, profileVersion]);
+  }, [online, filter, self, myClan, profileVersion, friends]);
 
   const total = online.length;
-  const shown = groups.self.length + groups.moderators.length + groups.clan.length + groups.players.length;
+  const shown = Object.values(groups).reduce((sum, list) => sum + list.length, 0);
 
   return (
     <div className="chat-roster surface-panel" id="chat-roster">
@@ -380,7 +403,7 @@ const Roster = memo(function Roster({
                   </li>
                   {!collapsed[group] &&
                     groups[group].map((user) => (
-                      <RosterRow key={user.name} user={user} group={group} self={self} profile={profiles.get(user.name)} onOpen={onOpen} />
+                      <RosterRow key={user.name} user={user} group={group} self={self} friends={friends} profile={profiles.get(user.name)} onOpen={onOpen} />
                     ))}
                 </Fragment>
               ),

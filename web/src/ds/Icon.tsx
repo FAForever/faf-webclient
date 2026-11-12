@@ -137,7 +137,8 @@ export type IconName =
   // Something failed: the icon errors carry, so the colour is not the only sign.
   | "alert"
   // Keyboard shortcuts.
-  | "keyboard";
+  | "keyboard"
+  | "monitor";
 
 interface IconProps extends SVGProps<SVGSVGElement> {
   name: IconName;
@@ -264,6 +265,8 @@ export function Icon({ name, size = 18, ...props }: IconProps) {
     shield: <><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></>,
     // Lucide `circle-alert`.
     alert: <><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></>,
+    // Lucide `monitor`.
+    monitor: <><rect width="20" height="14" x="2" y="3" rx="2" /><line x1="8" x2="16" y1="21" y2="21" /><line x1="12" x2="12" y1="17" y2="21" /></>,
     // Lucide `keyboard`.
     keyboard: <><path d="M10 8h.01" /><path d="M12 12h.01" /><path d="M14 8h.01" /><path d="M16 12h.01" /><path d="M18 8h.01" /><path d="M6 8h.01" /><path d="M7 16h10" /><path d="M8 12h.01" /><rect width="20" height="16" x="2" y="4" rx="2" /></>,
     github: <><path d="M15 22v-3.3c0-1.1-.4-1.9-1-2.3 3.3-.4 6.7-1.6 6.7-7.1 0-1.6-.6-2.9-1.6-3.9.2-.4.7-1.9-.2-3.8 0 0-1.3-.4-4.1 1.5a14 14 0 0 0-7.5 0C4.5 1.2 3.2 1.6 3.2 1.6c-.9 1.9-.4 3.4-.2 3.8-1 1-1.6 2.3-1.6 3.9 0 5.5 3.4 6.7 6.7 7.1-.6.4-1 1.1-1 2.3V22" /><path d="M7.1 18.3c-3 .9-3-1.4-4.2-1.8" /></>,

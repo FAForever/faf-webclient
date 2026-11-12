@@ -1,0 +1,296 @@
+/* A map or mod opened from the vault: the picture beside its facts, then the
+   description, reviews and versions. A sheet from the bottom on a phone (the
+   web-dialog rules in web.css). Bundled before web.css, so overrides of web-*
+   rules carry a second class. */
+
+/* The cards open their details. */
+.web-vault-open {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.web-card.web-vault-card {
+  transition: border-color 120ms ease;
+}
+
+.web-card.web-vault-card:hover {
+  border-color: var(--color-border-strong);
+}
+
+.web-vault-open:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.web-dialog.vault-detail {
+  width: min(820px, 100%);
+  gap: var(--space-4);
+}
+
+.vault-detail-top {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: var(--space-4);
+}
+
+.vault-detail-picture {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--color-picture-backdrop);
+  border-radius: var(--radius-md);
+}
+
+.vault-detail-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vault-detail-picture.is-logo img {
+  padding: var(--space-3);
+  object-fit: contain;
+  box-sizing: border-box;
+}
+
+.vault-detail-picture.is-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--color-subtle);
+}
+
+.vault-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.vault-detail-head p {
+  margin: 0;
+}
+
+.vault-detail-name-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.vault-detail-name-row h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.vault-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 0;
+}
+
+.vault-facts > div {
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-md);
+}
+
+.vault-facts dt {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vault-facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.vault-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.vault-section-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  padding-bottom: 6px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.vault-section-title .muted {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.vault-description {
+  max-height: 260px;
+  margin: 0;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vault-note {
+  margin: 0;
+  font-size: 13px;
+}
+
+.vault-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.vault-reviews,
+.vault-versions {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vault-review {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.vault-review:last-child {
+  border-bottom: 0;
+}
+
+.vault-review-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-2);
+  font-size: 13px;
+}
+
+.vault-review p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vault-stars {
+  display: inline-flex;
+  color: var(--color-border-strong);
+}
+
+.vault-stars .is-on {
+  color: var(--color-faction-seraphim);
+  fill: currentColor;
+}
+
+.vault-versions li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 32px;
+  font-size: 13px;
+}
+
+.vault-version-name {
+  font-weight: 600;
+}
+
+.vault-version-download {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  color: var(--color-muted);
+  border-radius: var(--radius-md);
+}
+
+.vault-version-download:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.web-button.vault-more {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.vault-uid {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .web-dialog.vault-detail {
+    max-height: 92vh;
+  }
+
+  .vault-detail-top {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .vault-detail-picture {
+    grid-row: 1 / span 3;
+    align-self: start;
+  }
+
+  .vault-detail-name-row h2 {
+    font-size: 1.1rem;
+  }
+
+  /* The facts take the whole width under the picture and the name. */
+  .vault-facts {
+    grid-column: 1 / -1;
+  }
+
+  .vault-detail-head {
+    display: contents;
+  }
+
+  .vault-detail-name-row,
+  .vault-detail-head > p,
+  .vault-detail-head > .web-chips {
+    grid-column: 2;
+  }
+
+  .vault-actions .web-button {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-height: 40px;
+  }
+}
