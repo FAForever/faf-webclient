@@ -51,9 +51,18 @@ interface Review {
   at: string | undefined;
 }
 
+/**
+ * The versions still in the vault. A hidden version was taken out (by its
+ * author or by moderation): it is not listed, not offered for download, and
+ * its reviews are not shown.
+ */
+function visibleVersions(doc: JsonApiDocument): JsonApiResource[] {
+  return (doc.data ?? []).filter((version) => pick<boolean>(version.attributes, "hidden") !== true);
+}
+
 function reviewsOf(doc: JsonApiDocument): Review[] {
   const out: Review[] = [];
-  for (const version of doc.data ?? []) {
+  for (const version of visibleVersions(doc)) {
     const refs = version.relationships?.reviews?.data;
     const label = String(pick(version.attributes, "version") ?? "");
     for (const ref of Array.isArray(refs) ? refs : []) {
@@ -110,10 +119,10 @@ function Reviews({ load }: { load: Load<JsonApiDocument> }) {
   );
 }
 
-function Versions({ load, kind }: { load: Load<JsonApiDocument>; kind: VaultKind }) {
+function Versions({ load }: { load: Load<JsonApiDocument> }) {
   const [all, setAll] = useState(false);
   if (load.state !== "ready") return null;
-  const versions = [...(load.data.data ?? [])].sort((a, b) =>
+  const versions = visibleVersions(load.data).sort((a, b) =>
     String(pick(b.attributes, "createTime") ?? "").localeCompare(String(pick(a.attributes, "createTime") ?? "")),
   );
   if (versions.length === 0) return null;
@@ -132,7 +141,6 @@ function Versions({ load, kind }: { load: Load<JsonApiDocument>; kind: VaultKind
               <span className="vault-version-name">Version {String(pick(a, "version") ?? "?")}</span>
               <span className="muted">{formatDate(pick(a, "createTime"))}</span>
               {pick<boolean>(a, "ranked") === false && <span className="web-chip">Unranked</span>}
-              {kind === "map" && pick<boolean>(a, "hidden") === true && <span className="web-chip">Withdrawn</span>}
               {download && (
                 <a className="vault-version-download" href={download} rel="noopener" title="Download this version">
                   <Icon name="download" size={14} />
@@ -280,7 +288,7 @@ export function VaultDetail({ kind, doc, item, onClose }: { kind: VaultKind; doc
           <Reviews load={history} />
         </section>
 
-        <Versions load={history} kind={kind} />
+        <Versions load={history} />
 
         {kind === "mod" && pick<string>(v, "uid") && <p className="muted vault-uid">UID {pick<string>(v, "uid")}</p>}
       </section>

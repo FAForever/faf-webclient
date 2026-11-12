@@ -89,7 +89,9 @@ const glob = (text: string) => `*${text.replace(/["*\\]/g, "")}*`;
 
 function queryFor(kind: Kind, f: Filters, page: number): Record<string, string> {
   const clauses: string[] = [];
-  if (kind === "map") clauses.push("latestVersion.hidden=='false'");
+  // Hidden is how maps and mods are taken out of the vault (by their author or
+  // by moderation): never shown, for both kinds, as in the Rust client.
+  clauses.push("latestVersion.hidden=='false'");
   // Every word has to appear somewhere in the name, in any order.
   for (const word of f.search.split(/\s+/).filter((w) => w.replace(/["*\\]/g, ""))) {
     clauses.push(`displayName=="${glob(word)}"`);
