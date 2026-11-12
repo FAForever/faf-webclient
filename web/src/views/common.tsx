@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ApiError, getJson } from "../api";
+import { ApiError, getJson, getText } from "../api";
 import { EmptyState } from "../ds/EmptyState";
 import type { IconName } from "../ds/Icon";
 
@@ -13,6 +13,15 @@ export type Load<T> =
  * the view is open; a failed refresh keeps the last good data on screen.
  */
 export function useJson<T>(path: string | null, refreshMs?: number): Load<T> {
+  return useLoad<T>(path, getJson as (path: string, signal: AbortSignal) => Promise<T>, refreshMs);
+}
+
+/** `useJson` for a text upstream. */
+export function useText(path: string | null, refreshMs?: number): Load<string> {
+  return useLoad(path, getText, refreshMs);
+}
+
+function useLoad<T>(path: string | null, get: (path: string, signal: AbortSignal) => Promise<T>, refreshMs?: number): Load<T> {
   const [load, setLoad] = useState<Load<T>>({ state: "loading" });
 
   useEffect(() => {
@@ -22,7 +31,7 @@ export function useJson<T>(path: string | null, refreshMs?: number): Load<T> {
     setLoad({ state: "loading" });
 
     const run = () =>
-      getJson<T>(path, controller.signal)
+      get(path, controller.signal)
         .then((data) => alive && setLoad({ state: "ready", data }))
         .catch((error: unknown) => {
           if (!alive || controller.signal.aborted) return;
@@ -89,4 +98,17 @@ export function LoadFailed({ icon, what, status, code }: { icon: IconName; what:
       bordered
     />
   );
+}
+
+/** Whether a CSS media query matches, kept up to date. */
+export function useMedia(query: string): boolean {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const list = window.matchMedia(query);
+    const update = () => setMatches(list.matches);
+    update();
+    list.addEventListener("change", update);
+    return () => list.removeEventListener("change", update);
+  }, [query]);
+  return matches;
 }

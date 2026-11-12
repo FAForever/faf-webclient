@@ -111,42 +111,6 @@ export function TournamentsView() {
   );
 }
 
-export function EventsView() {
-  const load = useJson<Row[] | { events?: Row[]; entries?: Row[] }>("/api/events/calendar.json", 300000);
-  const items = load.state === "ready" ? (Array.isArray(load.data) ? load.data : load.data.events ?? load.data.entries ?? []) : [];
-  return (
-    <div className="web-view">
-      <ViewHeader title="Events" description="Community events calendar." />
-      {load.state === "loading" && <Loading what="events" />}
-      {load.state === "error" && <LoadFailed icon="calendar" what="events" status={load.status} code={load.code} />}
-      {load.state === "ready" &&
-        (items.length === 0 ? (
-          <EmptyState icon="calendar" title="No upcoming events" bordered />
-        ) : (
-          <div className="web-list">
-            {items.map((ev, i) => {
-              const url = pick<string>(ev, "url", "link");
-              return (
-                <article key={i} className="web-card web-row">
-                  <div>
-                    <h2 className="web-card-title">{pick<string>(ev, "title", "name") ?? "-"}</h2>
-                    {pick<string>(ev, "description", "summary") && <p className="muted">{pick<string>(ev, "description", "summary")}</p>}
-                    {url && (
-                      <a href={url} target="_blank" rel="noopener noreferrer">
-                        More info <Icon name="external" size={13} />
-                      </a>
-                    )}
-                  </div>
-                  <span className="web-chip">{formatDate(pick(ev, "startsAt", "starts_at", "start", "date"))}</span>
-                </article>
-              );
-            })}
-          </div>
-        ))}
-    </div>
-  );
-}
-
 /** A page FAF already publishes, shown in place with a way out if framing is refused. */
 export function EmbedView({ title, description, url }: { title: string; description: string; url: string }) {
   return (

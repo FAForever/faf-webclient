@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Icon, type IconName } from "./ds/Icon";
-import { fafUrl } from "./hosts";
+import { go } from "./nav";
+import { ChangelogView } from "./changelog/ChangelogView";
+import { EventsView } from "./events/EventsView";
+import { NewsView } from "./news/NewsView";
 import { ChatView } from "./views/ChatView";
 import { ErrorBoundary } from "./views/ErrorBoundary";
-import { EmbedView, EventsView, LinksView, TournamentsView } from "./views/ListViews";
+import { EmbedView, LinksView, TournamentsView } from "./views/ListViews";
 import { LeaderboardView } from "./views/LeaderboardView";
 import { PlayView } from "./views/PlayView";
 import { ReplaysView } from "./views/ReplaysView";
@@ -20,12 +23,7 @@ interface TabDef {
 // Same order, labels and icons as the Rust client's sidebar (ui/src/features/nav/tabs.tsx),
 // minus Training and Settings. Chat is the one tab that needs a login.
 const TABS: TabDef[] = [
-  {
-    id: "news",
-    label: "News",
-    icon: "news",
-    Component: () => <EmbedView title="News" description="The FAF news hub." url={`${fafUrl("www")}/newshub`} />,
-  },
+  { id: "news", label: "News", icon: "news", Component: NewsView },
   { id: "chat", label: "Chat", icon: "chat", Component: ChatView },
   { id: "play", label: "Play", icon: "play", Component: PlayView },
   { id: "replays", label: "Replays", icon: "replays", Component: ReplaysView },
@@ -34,12 +32,7 @@ const TABS: TabDef[] = [
   { id: "leaderboard", label: "Leaderboard", icon: "leaderboard", Component: LeaderboardView },
   { id: "tournaments", label: "Tournaments", icon: "trophy", Component: TournamentsView },
   { id: "events", label: "Events", icon: "calendar", Component: EventsView },
-  {
-    id: "changelog",
-    label: "Changelog",
-    icon: "changelog",
-    Component: () => <EmbedView title="Changelog" description="Game patch notes published by FAF." url="https://faforever.github.io/fa/changelog" />,
-  },
+  { id: "changelog", label: "Changelog", icon: "changelog", Component: ChangelogView },
   {
     id: "units",
     label: "Units",
@@ -54,7 +47,8 @@ const DEFAULT_TAB = "play";
 function tabFromPath(): string {
   // FAF's login page sends the visitor back here; the Chat tab finishes the login.
   if (window.location.pathname === "/auth/callback") return "chat";
-  const id = window.location.pathname.replace(/^\/+|\/+$/g, "");
+  // The first part of the path: /changelog/3837 is the Changelog tab.
+  const id = window.location.pathname.split("/").filter(Boolean)[0] ?? "";
   return TABS.some((tab) => tab.id === id) ? id : DEFAULT_TAB;
 }
 
@@ -77,9 +71,9 @@ export function App() {
 
   const select = (id: string) => {
     setMenuOpen(false);
-    if (id === tab) return;
-    window.history.pushState(null, "", `/${id}`);
-    setTab(id);
+    // The same tab again still goes to its start: /changelog/3837 back to the list.
+    if (window.location.pathname === `/${id}`) return;
+    go(`/${id}`);
     contentRef.current?.scrollTo({ top: 0 });
   };
 

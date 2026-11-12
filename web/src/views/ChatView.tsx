@@ -556,6 +556,8 @@ export function ChatView() {
       .then((to) => {
         window.history.replaceState(null, "", to);
         if (alive) setCallback(false);
+        // A login started from another tab (Replays' "My replays") goes back there.
+        if (!to.startsWith("/chat")) window.dispatchEvent(new PopStateEvent("popstate"));
       });
     return () => {
       alive = false;
@@ -565,7 +567,8 @@ export function ChatView() {
   // Connect while logged in, for as long as the page is open.
   const userName = session?.user.name ?? "";
   useEffect(() => {
-    if (!userName) return;
+    // Not while a login is finishing: it may be on its way to another tab.
+    if (!userName || callback) return;
     let alive = true;
     void siteConfig().then((config) => {
       if (!alive || !config.chat) return;
@@ -575,7 +578,7 @@ export function ChatView() {
     return () => {
       alive = false;
     };
-  }, [userName, client]);
+  }, [userName, client, callback]);
 
   // Back to the page after a while away: reconnect at once, and what is on
   // screen has been read.

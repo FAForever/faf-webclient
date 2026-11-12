@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { fafPath, mapPreviewUrl, pick, related, type JsonApiDocument, type JsonApiResource } from "../api";
+import { beginLogin, getSession, siteConfig, subscribeSession } from "../auth";
 import { EmptyState } from "../ds/EmptyState";
 import { Icon } from "../ds/Icon";
 import { fafUrl } from "../hosts";
@@ -178,10 +179,54 @@ function DownloadById() {
   );
 }
 
+/**
+ * A player handed over in the address: /replays?player=Name from a player
+ * card, or /replays?mine=1 on the way back from a login started by "My
+ * replays", which is the logged-in player.
+ */
+function playerFromAddress(): string {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("mine")) return getSession()?.user.name ?? "";
+  return params.get("player")?.slice(0, 40) ?? "";
+}
+
 export function ReplaysView() {
-  const [typed, setTyped] = useState("");
-  const [player, setPlayer] = useState("");
+  const [typed, setTyped] = useState(playerFromAddress);
+  const [player, setPlayer] = useState(playerFromAddress);
   const [page, setPage] = useState(1);
+  const session = useSyncExternalStore(subscribeSession, getSession);
+  const me = session?.user.name ?? "";
+  const [canLogin, setCanLogin] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    siteConfig()
+      .then((config) => alive && setCanLogin(Boolean(config.login)))
+      .catch(() => undefined);
+    // "?mine" has done its job once read; the address stays shareable without it.
+    if (new URLSearchParams(window.location.search).has("mine")) window.history.replaceState(null, "", "/replays");
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const showing = (name: string) => {
+    setTyped(name);
+    setPlayer(name);
+    setPage(1);
+  };
+
+  const mine = Boolean(me) && player.toLowerCase() === me.toLowerCase();
+  const onMine = () => {
+    if (me) {
+      showing(mine ? "" : me);
+      return;
+    }
+    // Not logged in: FAF's login page, then back here with the name filled in.
+    setLoginError("");
+    beginLogin("/replays?mine=1").catch((err: unknown) => setLoginError(err instanceof Error ? err.message : "The login could not start."));
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -209,10 +254,24 @@ export function ReplaysView() {
     <div className="web-view">
       <ViewHeader title="Replays" description="Recently finished games. Download a replay to watch it in the desktop client." />
       <DownloadById />
-      <label className="web-search">
-        <Icon name="search" size={16} />
-        <input type="search" placeholder="Player name (exact)" value={typed} onChange={(event) => setTyped(event.target.value)} />
-      </label>
+      <div className="web-replay-search">
+        <label className="web-search">
+          <Icon name="search" size={16} />
+          <input type="search" placeholder="Player name (exact)" value={typed} onChange={(event) => setTyped(event.target.value)} />
+        </label>
+        {(me || canLogin) && (
+          <button
+            type="button"
+            className={`web-button${mine ? " is-active" : ""}`}
+            aria-pressed={mine}
+            onClick={onMine}
+            title={me ? `Games played by ${me}` : "Log in with your FAF account to see your own games"}
+          >
+            <Icon name="user" size={14} /> My replays
+          </button>
+        )}
+      </div>
+      {loginError && <p className="muted">{loginError}</p>}
 
       {load.state === "loading" && <Loading what="replays" />}
       {load.state === "error" && <LoadFailed icon="replays" what="replays" status={load.status} code={load.code} />}

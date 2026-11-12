@@ -1,0 +1,193 @@
+/* The News tab: a lead article, then the rest as a grid of cards. A page that
+   scrolls, unlike the desktop client's framed website (ds/shell.css keeps the
+   news tab for an embed, so that is undone here; `.web-shell` because this
+   file is bundled before shell.css). */
+
+.web-shell .content.content-tab-news {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  --content-gutter: var(--scrollbar-size);
+}
+
+.web-shell .content-inner.content-news {
+  height: auto;
+  padding: 28px 28px 18px;
+  padding-right: max(0px, 28px - var(--content-gutter, 0px));
+  overflow: visible;
+}
+
+.news-view {
+  max-width: 1200px;
+}
+
+.news-lead,
+.news-card {
+  display: grid;
+  overflow: hidden;
+  color: var(--color-text);
+  text-decoration: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.news-lead.is-link:hover,
+.news-card.is-link:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+.news-lead.is-link:focus-visible,
+.news-card.is-link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.news-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--color-surface-raised);
+}
+
+.news-picture.is-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--color-subtle);
+}
+
+/* The lead: picture beside the text on a wide screen, above it on a phone. */
+.news-lead {
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  min-height: 260px;
+}
+
+.news-lead-picture {
+  min-height: 220px;
+}
+
+.news-lead-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) calc(var(--space-4) * 1.5);
+}
+
+.news-lead-body h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 650;
+  line-height: 1.25;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.news-byline {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.news-text {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.news-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: var(--space-2);
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.news-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.news-card {
+  grid-template-rows: auto 1fr;
+}
+
+.news-card-picture {
+  aspect-ratio: 16 / 9;
+  height: auto;
+}
+
+.news-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.news-card-body h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.news-card .news-text {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
+@media (max-width: 900px) {
+  .web-shell .content-inner.content-news {
+    padding: 22px;
+    padding-right: max(0px, 22px - var(--content-gutter, 0px));
+  }
+
+  .news-lead {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .news-lead-picture {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+    height: auto;
+  }
+
+  .news-lead-body {
+    padding: var(--space-3) var(--space-4) var(--space-4);
+  }
+
+  .news-lead-body h2 {
+    font-size: 1.2rem;
+  }
+
+  .news-lead .news-text {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+  }
+
+  .news-text {
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 720px) {
+  .news-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -10,8 +10,8 @@ export class ApiError extends Error {
   }
 }
 
-export async function getJson<T = unknown>(path: string, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, { signal, headers: { Accept: "application/json" } });
+async function fetchOk(path: string, accept: string, signal?: AbortSignal): Promise<Response> {
+  const res = await fetch(path, { signal, headers: { Accept: accept } });
   if (!res.ok) {
     let code: string | null = null;
     try {
@@ -22,7 +22,16 @@ export async function getJson<T = unknown>(path: string, signal?: AbortSignal): 
     }
     throw new ApiError(res.status, `${res.status} ${res.statusText}`, code);
   }
-  return (await res.json()) as T;
+  return res;
+}
+
+export async function getJson<T = unknown>(path: string, signal?: AbortSignal): Promise<T> {
+  return (await (await fetchOk(path, "application/json", signal)).json()) as T;
+}
+
+/** For the upstreams that are not JSON: the changelog's page and notes. */
+export async function getText(path: string, signal?: AbortSignal): Promise<string> {
+  return (await fetchOk(path, "text/plain, text/html, */*", signal)).text();
 }
 
 /** First defined, non-empty value among several possible field names. */

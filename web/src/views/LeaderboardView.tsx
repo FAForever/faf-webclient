@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { EmptyState } from "../ds/EmptyState";
 import { Icon } from "../ds/Icon";
 import { LoadFailed, Loading, useJson, ViewHeader } from "./common";
+import { PlayerCard } from "./PlayerCard";
 
 // The boards faforever.com publishes (FAForever/website, leaderboardRouter.js).
 const BOARDS = [
@@ -27,6 +28,7 @@ function winRate(won: number | null, games: number | null): string {
 }
 
 export function LeaderboardView() {
+  const [player, setPlayer] = useState<{ id: number; name: string } | null>(null);
   const [board, setBoard] = useState<string>("global");
   const [page, setPage] = useState(1);
   const [typed, setTyped] = useState("");
@@ -91,7 +93,20 @@ export function LeaderboardView() {
                 {load.data.rows.map((row, index) => (
                   <tr key={row.playerId ?? `row-${index}`}>
                     <td className="num muted">{row.rank ?? "-"}</td>
-                    <td>{row.name}</td>
+                    <td>
+                      {row.playerId != null ? (
+                        <button
+                          type="button"
+                          className="web-name-link"
+                          title={`${row.name}: ratings and replays`}
+                          onClick={() => setPlayer({ id: row.playerId as number, name: row.name })}
+                        >
+                          {row.name}
+                        </button>
+                      ) : (
+                        row.name
+                      )}
+                    </td>
                     <td className="num">{row.rating ?? "-"}</td>
                     <td className="num muted">{row.games ?? "-"}</td>
                     <td className="num muted">{winRate(row.won, row.games)}</td>
@@ -112,6 +127,7 @@ export function LeaderboardView() {
             </div>
           </>
         ))}
+      {player && <PlayerCard id={player.id} name={player.name} onClose={() => setPlayer(null)} />}
     </div>
   );
 }

@@ -1,0 +1,704 @@
+/* The Changelog tab, from the Rust client: the note's blocks
+   (ui/src/shared/components/changelog-blocks.css) and the list and reading
+   surface (ui/src/features/changelog/changelog.css), with the parts this site
+   has no use for left out, and the phone layout added at the end. */
+
+.changelog-heading {
+  margin: 32px 0 10px;
+  color: var(--color-text);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  scroll-margin-top: 16px;
+}
+
+.changelog-heading-2 {
+  font-size: 20px;
+}
+
+.changelog-heading-3 {
+  margin-top: 24px;
+  font-size: 17px;
+}
+
+.changelog-heading-4,
+.changelog-heading-5,
+.changelog-heading-6 {
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--color-muted);
+}
+
+.changelog-paragraph,
+.changelog-list {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-text);
+}
+
+.changelog-list {
+  padding-left: 20px;
+}
+
+ol.changelog-list {
+  list-style-type: decimal;
+}
+
+.changelog-list .changelog-list {
+  margin: 4px 0 6px;
+}
+
+.changelog-list + .changelog-list {
+  margin-top: 24px;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.changelog-list > li > .changelog-list + .changelog-list {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.changelog-list li {
+  margin-bottom: 3px;
+}
+
+.changelog-list li::marker {
+  color: var(--color-subtle);
+}
+
+.changelog-unit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+  scroll-margin-top: 16px;
+}
+
+.changelog-heading + .changelog-unit {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.changelog-unit-icons {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.changelog-unit-icon {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  user-select: none;
+}
+
+.changelog-unit-name {
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.changelog-change {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-change-label {
+  font-weight: 600;
+}
+
+.changelog-change-label::after {
+  content: ":";
+}
+
+.changelog-old {
+  color: var(--color-error-text);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--color-error) 55%, transparent);
+}
+
+.changelog-new {
+  font-weight: 600;
+  color: var(--color-ok-text);
+}
+
+.changelog-change svg {
+  flex: none;
+  color: var(--color-subtle);
+}
+
+.changelog-link,
+.changelog-issue {
+  padding: 0;
+  font: inherit;
+  color: var(--color-text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--color-subtle);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.changelog-link:hover,
+.changelog-issue:hover {
+  text-decoration-color: var(--color-text);
+}
+
+.changelog-link:focus-visible,
+.changelog-issue:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.changelog-issue {
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-code {
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.changelog-code-block {
+  margin: 0;
+  padding: var(--space-4);
+  overflow: auto;
+  scrollbar-gutter: stable;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+  tab-size: 4;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.changelog-code-block code {
+  font: inherit;
+}
+
+.changelog-code-block:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.changelog-view {
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  gap: var(--space-4);
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.changelog-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: var(--space-3) 0 var(--space-3) var(--space-3);
+}
+
+.changelog-search {
+  flex: 0 0 auto;
+  margin-right: var(--space-3);
+}
+
+.changelog-releases {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-right: var(--space-2);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  
+  scroll-padding-top: 36px;
+  scrollbar-width: thin;
+}
+
+.changelog-list-note {
+  margin: var(--space-3) var(--space-2);
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.changelog-year + .changelog-year {
+  margin-top: var(--space-1);
+}
+
+.changelog-year-toggle {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 var(--space-2) 0 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-surface);
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.changelog-year-toggle:hover {
+  background: var(--color-surface-hover);
+}
+
+.changelog-year-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.changelog-year-toggle svg {
+  flex: none;
+  color: var(--color-subtle);
+}
+
+.changelog-year-count {
+  margin-left: auto;
+  color: var(--color-subtle);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-year-releases {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.changelog-year-releases[hidden] {
+  display: none;
+}
+
+.changelog-release {
+  display: grid;
+  grid-template-columns: 4.5ch minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 30px;
+  padding: 0 var(--space-2) 0 22px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-muted);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 100ms ease, color 100ms ease;
+}
+
+.changelog-release:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.changelog-release:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.changelog-release[aria-current="page"] {
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--color-border-strong);
+}
+
+.changelog-release-id {
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-release-date {
+  color: var(--color-subtle);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-release.is-patch {
+  color: var(--color-text);
+}
+
+.changelog-release.is-patch .changelog-release-id,
+.changelog-release.is-patch .changelog-release-kind {
+  color: var(--color-event-patch);
+}
+
+.changelog-note {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  container-type: inline-size;
+  container-name: changelog-note;
+}
+
+.changelog-note-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-shrink: 0;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.changelog-note-heading {
+  min-width: 0;
+}
+
+.changelog-note-head h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.changelog-note-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 18px;
+  gap: 6px var(--space-3);
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.changelog-kind-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.changelog-kind-tag.is-patch {
+  color: var(--color-event-patch);
+}
+
+.changelog-note-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.changelog-step {
+  display: inline-flex;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.changelog-step-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  padding: 0;
+  color: var(--color-text);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+
+.changelog-step-btn + .changelog-step-btn {
+  border-left: 1px solid var(--color-border);
+}
+
+.changelog-step-btn:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+.changelog-step-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.changelog-step-btn:disabled {
+  color: var(--color-subtle);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.changelog-external {
+  gap: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.changelog-note-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  container-type: size;
+  container-name: changelog-scroll;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .changelog-note-scroll {
+    scroll-behavior: smooth;
+  }
+}
+
+.changelog-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 var(--space-4);
+  padding: 0 0 var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.changelog-jump-item {
+  min-height: 28px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 100ms ease, border-color 100ms ease;
+}
+
+.changelog-jump-item:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+.changelog-jump-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.changelog-jump + .changelog-unit {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .changelog-skeleton > span {
+    animation: none;
+  }
+}
+
+/* ---- web additions ------------------------------------------------------ */
+
+/* The tab fills the window and its two panels scroll on their own. */
+.web-view.web-view-changelog {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-width: none;
+  height: 100%;
+}
+
+.changelog-view {
+  height: auto;
+  min-height: 0;
+}
+
+.changelog-sidebar {
+  overflow: hidden;
+}
+
+.web-search.changelog-search {
+  max-width: none;
+}
+
+.changelog-note-copy {
+  max-width: 80ch;
+  padding: 20px 28px 48px;
+}
+
+.changelog-note-copy > :first-child {
+  margin-top: 0;
+}
+
+.changelog-release-kind {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changelog-list li.is-change::marker {
+  color: var(--color-border-strong);
+}
+
+.changelog-unit-icons:empty {
+  display: none;
+}
+
+.changelog-item-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  vertical-align: middle;
+}
+
+.changelog-item-unit .changelog-unit-icon {
+  border-radius: var(--radius-sm);
+}
+
+.changelog-code-block {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.web-button.changelog-external {
+  padding: 6px 10px;
+}
+
+.changelog-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--space-2);
+  padding: 4px 0;
+  color: var(--color-muted);
+  font: inherit;
+  font-size: 13px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.changelog-back:hover {
+  color: var(--color-text);
+}
+
+/* A phone: the page scrolls, the list and the note are pages of their own.
+   `.web-shell` because this file is bundled before ds/shell.css. */
+@media (max-width: 900px) {
+  .web-shell .content.content-tab-changelog {
+    overflow-y: auto;
+  }
+
+  .web-shell .content-inner.content-changelog {
+    height: auto;
+    overflow: visible;
+  }
+
+  .web-view.web-view-changelog {
+    display: flex;
+    height: auto;
+  }
+
+  .changelog-sidebar,
+  .changelog-note {
+    overflow: visible;
+  }
+
+  .changelog-sidebar {
+    padding: var(--space-3);
+  }
+
+  .changelog-search {
+    margin-right: 0;
+  }
+
+  .changelog-releases {
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .changelog-release {
+    min-height: 40px;
+  }
+
+  /* The note uses the phone's whole width: no card around it. */
+  .changelog-note.surface-panel {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .changelog-note-head {
+    flex-direction: column;
+    padding: 0 0 12px;
+  }
+
+  .changelog-note-actions {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+
+  .changelog-note-scroll {
+    overflow: visible;
+    container-type: normal;
+  }
+
+  .changelog-note-copy {
+    padding: 16px 0 32px;
+  }
+
+  .changelog-paragraph,
+  .changelog-list {
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .changelog-list {
+    padding-left: 18px;
+  }
+
+  .changelog-list .changelog-list {
+    padding-left: 14px;
+  }
+
+  .changelog-unit-icon[width="48"] {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  .changelog-year-toggle {
+    min-height: 40px;
+  }
+}

@@ -32,13 +32,13 @@ const http = require('http');
 const path = require('path');
 
 const { resolve: resolveUpstream } = require('./lib/upstreams');
-const { createCache, proxyGet } = require('./lib/proxy');
+const { createCache, proxyGet, servedContentType } = require('./lib/proxy');
 const { resolveFile, cacheHeader } = require('./lib/static');
 const { createWatcher } = require('./lib/watcher');
 const { createTokenSource } = require('./lib/faftoken');
 const { createUserLogin, CHAT_URL } = require('./lib/userlogin');
 const { boardTarget, pageOf, apiTarget, pageFromApi } = require('./lib/leaderboard');
-const { BASE_DOMAIN, fafUrl } = require('./lib/hosts');
+const { BASE_DOMAIN, IN_CLUSTER, fafUrl, serverUrl } = require('./lib/hosts');
 
 const PORT = Number(process.env.PORT || 8098);
 // Auto-update. Off unless AUTO_UPDATE=1, so nothing changes for anyone who
@@ -93,7 +93,9 @@ function securityHeaders() {
     // domain in November 2026; the old address redirects there.
     'Content-Security-Policy': [
       "default-src 'self'",
-      "img-src 'self' " + fafUrl('content') + " data:",
+      // FAF's content server (maps, mods, avatars), the news hub's pictures
+      // (WordPress) and the patch notes' unit icons.
+      "img-src 'self' " + fafUrl('content') + " https://direct.faforever.com https://faforever.github.io data:",
       // News is FAF's own site, so it follows the base domain; the changelog
       // and unit db exist only once.
       "frame-src " + fafUrl('www') + " https://faforever.github.io https://unitdb.faforever.com https://www.youtube-nocookie.com",
@@ -161,7 +163,7 @@ async function handleApi(req, res, url) {
   }, out.via || {}));
 
   res.writeHead(out.status, Object.assign({
-    'Content-Type': out.contentType,
+    'Content-Type': servedContentType(out.contentType),
     'Content-Length': out.body.length,
     'Cache-Control': 'no-store',
     'X-Cache': out.cached ? 'HIT' : 'MISS'
@@ -372,6 +374,8 @@ const server = http.createServer((req, res) => {
       ok: true,
       service: 'faf-webclient',
       baseDomain: BASE_DOMAIN,
+      // true in FAF's cluster: FAF's services are called by their internal names.
+      inCluster: IN_CLUSTER,
       uptimeSeconds: Math.floor((Date.now() - started) / 1000),
       cacheEntries: cache.size(),
       playTab: true,
@@ -407,7 +411,11 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    log('info', 'listening', { port: PORT, publicDir: PUBLIC_DIR, playTab: true, autoUpdate: AUTO_UPDATE });
+    log('info', 'listening', {
+      port: PORT, publicDir: PUBLIC_DIR, autoUpdate: AUTO_UPDATE, baseDomain: BASE_DOMAIN,
+      // Where the server itself reaches FAF: internal names in FAF's cluster.
+      api: serverUrl('api'), hydra: serverUrl('hydra'), userService: serverUrl('user')
+    });
   });
 
   if (AUTO_UPDATE) {

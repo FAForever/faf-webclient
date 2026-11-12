@@ -20,10 +20,14 @@ const { spawn, spawnSync } = require('child_process');
 // The suite checks the real FAF host names. The deployment's own setting
 // (FAF_BASE_DOMAIN=faforever.xyz on FAF's test cluster) must not change that:
 // the suite also runs inside a container before every auto-update.
-delete process.env.FAF_BASE_DOMAIN;
+// The same goes for running inside Kubernetes and the per-service overrides.
+for (const name of ['FAF_BASE_DOMAIN', 'KUBERNETES_SERVICE_HOST', 'FAF_API_URL', 'FAF_HYDRA_URL',
+  'FAF_USER_SERVICE_URL', 'FAF_WEBSITE_URL', 'FAF_TOURNAMENTS_URL', 'FAF_LOBBY_URL']) {
+  delete process.env[name];
+}
 
 const { resolve } = require('./lib/upstreams');
-const { createCache, proxyGet, UPSTREAM_HEADERS } = require('./lib/proxy');
+const { createCache, proxyGet, servedContentType, UPSTREAM_HEADERS } = require('./lib/proxy');
 const { resolveFile } = require('./lib/static');
 const { createWatcher, redactUrl } = require('./lib/watcher');
 const { createTokenSource } = require('./lib/faftoken');
@@ -54,6 +58,19 @@ function testUpstreams() {
   const lobby = resolve('lobby', 'games', '');
   ok(lobby && lobby.url === 'https://lobby.faforever.com/games',
     'upstream: the public lobby list resolves to lobby.faforever.com/games', lobby && lobby.url);
+  const news = resolve('news', 'newshub.json', '');
+  ok(news && news.url === 'https://www.faforever.com/data/newshub.json', 'upstream: the news hub resolves to the website\'s newshub.json', news && news.url);
+  eq(resolve('news', 'clans.json', ''), null, 'upstream: nothing else in the website\'s /data');
+  const index = resolve('changelog', 'changelog', '');
+  ok(index && index.url === 'https://faforever.github.io/fa/changelog', 'upstream: the patch index resolves to the FA docs site', index && index.url);
+  eq(resolve('changelog', 'assets/js/x.js', ''), null, 'upstream: nothing else on the FA docs site');
+  const note = resolve('patchnote', '2026-08-14-3837.md', '');
+  ok(note && note.url === 'https://raw.githubusercontent.com/FAForever/fa/master/docs/_posts/2026-08-14-3837.md',
+    'upstream: a patch note resolves to its Markdown source', note && note.url);
+  eq(resolve('patchnote', '../../README.md', ''), null, 'upstream: patch notes cannot leave the posts folder');
+  eq(resolve('patchnote', 'secrets.md', ''), null, 'upstream: only dated patch notes');
+  eq(servedContentType('text/html; charset=utf-8'), 'text/plain; charset=utf-8', 'proxy: another site\'s HTML is served as plain text');
+  eq(servedContentType('application/vnd.api+json'), 'application/vnd.api+json', 'proxy: JSON keeps its type');
   const queues = resolve('lobby', 'matchmaker', '');
   ok(queues && queues.url === 'https://lobby.faforever.com/matchmaker',
     'upstream: the public matchmaker queues resolve to lobby.faforever.com/matchmaker', queues && queues.url);
@@ -221,7 +238,7 @@ async function testUserLogin() {
 
 function testBaseDomain() {
   // A fresh process per setting: the host names are fixed when the modules load.
-  function hostsWith(domain) {
+  function hostsWith(domain, extraEnv) {
     const script = `
       const { resolve } = require('./lib/upstreams');
       const { boardTarget } = require('./lib/leaderboard');
@@ -234,10 +251,12 @@ function testBaseDomain() {
         board: boardTarget('global').url,
         token: DEFAULT_TOKEN_URL,
         authorize: login.login.authorizeUrl,
-        chat: login.chat.url
+        chat: login.chat.url,
+        user: require('./lib/hosts').serverUrl('user'),
+        transport: require('./lib/hosts').transport('http://faf-api:8010') === require('http')
       }));`;
     const out = spawnSync(process.execPath, ['-e', script], {
-      cwd: __dirname, encoding: 'utf8', env: Object.assign({}, process.env, { FAF_BASE_DOMAIN: domain })
+      cwd: __dirname, encoding: 'utf8', env: Object.assign({}, process.env, { FAF_BASE_DOMAIN: domain }, extraEnv || {})
     });
     return out.status === 0 ? JSON.parse(out.stdout) : { failed: out.stderr };
   }
@@ -253,6 +272,23 @@ function testBaseDomain() {
 
   const unset = hostsWith('');
   eq(unset.api, 'https://api.faforever.com/data/map', 'base domain: unset means faforever.com');
+
+  // In FAF's cluster the server skips Cloudflare and calls the services
+  // directly; the browser keeps the public addresses.
+  const cluster = hostsWith('faforever.com', { KUBERNETES_SERVICE_HOST: '10.0.0.1' });
+  eq(cluster.api, 'http://faf-api:8010/data/map', 'in cluster: the API by its internal name');
+  eq(cluster.tourney, 'http://faf-tournaments:8090/api/tournaments', 'in cluster: tournaments by internal name');
+  eq(cluster.board, 'http://faf-website:3000/leaderboards/global.json', 'in cluster: the website by internal name');
+  eq(cluster.token, 'http://ory-hydra:4444/oauth2/token', 'in cluster: tokens from Hydra directly');
+  eq(cluster.user, 'http://faf-user-service:8080', 'in cluster: chat tokens from the user service directly');
+  eq(cluster.authorize, 'https://hydra.faforever.com/oauth2/auth', 'in cluster: the browser still logs in on the public page');
+  eq(cluster.chat, 'wss://chat.faforever.com', 'in cluster: the browser still chats on the public address');
+  eq(cluster.lobby, 'https://lobby.faforever.com/games', 'in cluster: no internal name assumed for the lobby');
+  ok(cluster.transport === true, 'in cluster: plain http is used for internal addresses');
+  const forced = hostsWith('faforever.com', { KUBERNETES_SERVICE_HOST: '10.0.0.1', FAF_API_URL: 'http://api.internal:9000/' });
+  eq(forced.api, 'http://api.internal:9000/data/map', 'override: an address set by hand wins');
+  const badOverride = hostsWith('faforever.com', { FAF_API_URL: 'http://x/evil?y' });
+  ok(badOverride.failed && /FAF_API_URL/.test(badOverride.failed), 'override: a malformed address refuses to start');
 
   const bad = hostsWith('evil.example/x');
   ok(bad.failed && /FAF_BASE_DOMAIN/.test(bad.failed), 'base domain: anything but a domain name refuses to start');

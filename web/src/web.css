@@ -32,6 +32,10 @@ body {
   margin: 4px 0 0;
 }
 
+.web-view-actions .web-button {
+  white-space: nowrap;
+}
+
 .web-state {
   padding: var(--space-4) 0;
 }
@@ -104,6 +108,28 @@ body {
   flex: 1 1 220px;
 }
 
+.web-replay-search {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+  max-width: 560px;
+}
+
+.web-replay-search .web-search {
+  flex: 1 1 auto;
+  max-width: none;
+}
+
+.web-replay-search .web-button {
+  white-space: nowrap;
+}
+
+.web-button.is-active {
+  color: var(--color-text);
+  background: var(--color-accent-glow);
+  border-color: var(--color-accent);
+}
+
 .web-replay-id {
   display: flex;
   flex-direction: column;
@@ -143,7 +169,7 @@ body {
   outline-offset: -1px;
 }
 
-.web-button-primary {
+.web-button.web-button-primary {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-contrast);
@@ -259,6 +285,19 @@ body {
   background: var(--color-picture-backdrop);
 }
 
+/* Mod logos come in any shape: whole, not cropped. */
+.web-vault-thumb.is-logo {
+  object-fit: contain;
+  padding: var(--space-3);
+}
+
+/* No art: the vault's icon, quiet on the same backdrop. */
+.web-vault-thumb.is-placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--color-subtle);
+}
+
 .web-vault-body {
   display: flex;
   flex-direction: column;
@@ -293,6 +332,50 @@ body {
   background: transparent;
   color: var(--color-text);
   font: inherit;
+}
+
+/* Vault search and filters: two text fields, then the selects in a row. */
+.web-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  max-width: 900px;
+}
+
+.web-filters .web-search {
+  max-width: none;
+}
+
+.web-filter-row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.web-select {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.web-select select {
+  min-width: 120px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.web-select select:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
 }
 
 .web-segmented {
@@ -509,8 +592,155 @@ body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .web-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .web-filter-row .web-select {
+    flex: 1 1 40%;
+  }
+
+  .web-select select {
+    min-width: 0;
+    width: 100%;
+    font-size: 16px;
+  }
+
+  .web-search input {
+    font-size: 16px;
+  }
+
   .web-table th:last-child,
   .web-table td:last-child {
     display: none;
+  }
+}
+
+/* ---- Dialogs: the player card ------------------------------------------------ */
+
+.web-name-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.web-name-link:hover,
+.web-name-link:focus-visible {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.web-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.web-icon-button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.web-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: var(--space-3);
+  background: rgb(0 0 0 / 0.55);
+}
+
+.web-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(520px, 100%);
+  max-height: calc(100vh - 2 * var(--space-3));
+  overflow: auto;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover, 0 12px 40px rgb(0 0 0 / 0.45));
+}
+
+.web-player-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.web-player-avatar {
+  width: 40px;
+  height: 20px;
+  margin-top: 4px;
+  object-fit: contain;
+}
+
+.web-player-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.web-player-title h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 1.15rem;
+  overflow-wrap: anywhere;
+}
+
+.web-player-title p {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+}
+
+.web-player-clan {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.web-player-ratings th:first-child,
+.web-player-ratings td:first-child {
+  width: auto;
+}
+
+.web-player-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@media (max-width: 720px) {
+  /* A sheet from the bottom on a phone. */
+  .web-dialog-backdrop {
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .web-dialog {
+    width: 100%;
+    max-height: 85vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  }
+
+  /* The table hides its last column on phones; the card's table is small enough to keep it. */
+  .web-player-ratings th:last-child,
+  .web-player-ratings td:last-child {
+    display: table-cell;
   }
 }
