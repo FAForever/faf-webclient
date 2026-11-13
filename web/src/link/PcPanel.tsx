@@ -60,6 +60,8 @@ const GAME_STATUS: Record<NonNullable<PcState["game"]>["status"], string> = {
   launched: "The game is starting",
   lobby: "In a game lobby",
   playing: "Playing",
+  needsYou: "Your PC needs you",
+  failed: "The join failed",
 };
 
 function statusLine(state: PcState): { text: string; tone: "idle" | "busy" | "found" } {
@@ -94,7 +96,9 @@ function Matchmaking({ state }: { state: PcState }) {
   const partySize = Math.max(1, state.party.members.length);
   const me = state.player?.id ?? null;
   const notLeader = partySize > 1 && state.party.ownerId !== null && state.party.ownerId !== me;
-  const inGame = state.game !== null && !starting;
+  // A join that stopped short leaves the PC free: only its message stays.
+  const stopped = state.game !== null && (state.game.status === "needsYou" || state.game.status === "failed");
+  const inGame = state.game !== null && !starting && !stopped;
   const offline = state.lobby !== "connected";
   const locked = busy || active || starting || notLeader || inGame || offline;
 
@@ -139,7 +143,7 @@ function Matchmaking({ state }: { state: PcState }) {
               >
                 <span className="pc-queue-title">
                   {on && <Icon name="check" size={14} />}
-                  {queueTitle(queue)}
+                  {queueTitle(queue, state.queues)}
                 </span>
                 <span className="pc-queue-meta muted">
                   <span>
@@ -167,6 +171,15 @@ function Matchmaking({ state }: { state: PcState }) {
         <p className="muted pc-note">
           {GAME_STATUS[state.game.status]}
           {state.game.title ? `: ${state.game.title}` : ""}
+        </p>
+      )}
+      {stopped && state.game && (
+        <p className={`pc-attention${state.game.status === "needsYou" ? " is-needs-you" : ""}`} role="status">
+          <strong>
+            {GAME_STATUS[state.game.status]}
+            {state.game.title ? `: ${state.game.title}` : ""}
+          </strong>
+          {state.game.problem && <span>{state.game.problem}</span>}
         </p>
       )}
 
@@ -231,7 +244,7 @@ function NotifyToggle() {
     <span className="pc-notify">
       <label className="pc-check">
         <input type="checkbox" checked={on} disabled={busy} onChange={(event) => void change(event.target.checked)} />
-        Notify this device when a match is found
+        Notify this device when a match is found or your PC needs you
       </label>
       {problem && <span className="pc-problem">{problem}</span>}
     </span>
@@ -306,7 +319,7 @@ export function PcPanel() {
   const [open, setOpen] = useState(true);
 
   const pill = useMemo(() => {
-    if (link.status === "ready" && link.pc.connected) return { text: link.pc.device ? `Connected: ${link.pc.device}` : "Connected", tone: "ok" };
+    if (link.status === "ready" && link.pc.connected) return { text: "Connected", tone: "ok", hint: link.pc.client };
     if (link.status === "ready") return { text: "Not connected", tone: "off" };
     if (link.status === "connecting") return { text: "Connecting...", tone: "off" };
     if (link.status === "failed") return { text: "Unavailable", tone: "warn" };
@@ -321,7 +334,11 @@ export function PcPanel() {
         <h2 id="pc-title" className="web-card-title">
           <Icon name="monitor" size={17} /> Your PC
         </h2>
-        {pill && <span className={`pc-pill is-${pill.tone}`}>{pill.text}</span>}
+        {pill && (
+          <span className={`pc-pill is-${pill.tone}`} title={"hint" in pill ? pill.hint : undefined}>
+            {pill.text}
+          </span>
+        )}
         <button type="button" className="web-icon-button pc-collapse" aria-expanded={open} aria-label={open ? "Hide" : "Show"} onClick={() => setOpen((v) => !v)}>
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>

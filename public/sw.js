@@ -1,5 +1,6 @@
-// The site's service worker. It does one thing: show "Match found" when the
-// PC link sends a push (lib/link.js), and bring the site up when it is tapped.
+// The site's service worker. It does one thing: show "Match found" or "Your PC
+// needs you" when the PC link sends a push (lib/link.js), and bring the site up
+// when it is tapped.
 // No caching and no offline mode: every page load still comes from the server.
 
 self.addEventListener("install", () => self.skipWaiting());

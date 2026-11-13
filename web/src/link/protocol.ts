@@ -2,18 +2,17 @@
 // site (lib/link.js), and what the page may ask it to do.
 //
 // The shapes are the Rust client's (crates/faf-domain/src/protocol/web_link.rs
-// in its repository): it builds them from its own state, this site only passes
-// them on. Version 1.
+// in its repository, and docs/web-link-protocol.json there, which the server's
+// tests check against): it builds them from its own state, this site only
+// passes them on. Version 1.
 
 export const LINK_VERSION = 1;
 
 /** The PC as the server describes it to a browser. */
 export interface PcInfo {
   connected: boolean;
-  /** "FAF Rust client 1.4.0", say. */
+  /** "FAF Rust client 1.4.0", say. Nothing about the computer itself is sent. */
   client?: string;
-  /** The computer's name, as the client chose to report it. */
-  device?: string;
   /** The FAF account it is logged in as. */
   name?: string;
 }
@@ -23,6 +22,8 @@ export type MatchmakingStatus = "idle" | "preparing" | "searching" | "matchFound
 export interface PcQueue {
   /** Technical name, as the commands take it: "ladder1v1", "tmm2v2", ... */
   name: string;
+  /** "1 vs 1", as the client on the PC names it. */
+  title: string;
   teamSize: number;
   /** Players searching in it right now. */
   playersInQueue: number;
@@ -44,10 +45,19 @@ export interface PcState {
   queues: PcQueue[];
   matchmaking: { status: MatchmakingStatus; queues: string[] };
   party: { ownerId: number | null; members: { id: number; name: string }[] };
-  /** The game this PC is joining or playing, if any. */
-  game: { id: number | null; title: string; status: "joining" | "preparing" | "launched" | "lobby" | "playing" } | null;
+  /** The game this PC is joining or playing, if any; or a join that stopped short. */
+  game: PcCurrentGame | null;
   /** Everyone on the friends list, online first. */
   friends: PcFriend[];
+}
+
+export interface PcCurrentGame {
+  id: number | null;
+  title: string;
+  /** "needsYou": stopped at a decision only the player at the PC can make. */
+  status: "joining" | "preparing" | "launched" | "lobby" | "playing" | "needsYou" | "failed";
+  /** For "needsYou" and "failed": what happened, in a sentence. */
+  problem: string | null;
 }
 
 /** One open lobby, from the PC's own lobby list. */
@@ -77,9 +87,14 @@ export type LinkCommand =
   | { action: "joinGame"; gameId: number; password?: string }
   | { action: "refresh" };
 
-/** "1 vs 1", as the Rust client names a queue. Two 4v4 queues tell themselves apart. */
-export function queueTitle(queue: Pick<PcQueue, "name" | "teamSize">): string {
-  const base = `${queue.teamSize} vs ${queue.teamSize}`;
+/**
+ * A queue as the client on the PC titles it ("1 vs 1"). Two queues of the same
+ * size (the 4v4s) would read the same, so only then they tell themselves apart.
+ */
+export function queueTitle(queue: Pick<PcQueue, "name" | "teamSize" | "title">, queues: PcQueue[] = []): string {
+  const base = queue.title || `${queue.teamSize} vs ${queue.teamSize}`;
+  const twin = queues.some((other) => other.name !== queue.name && (other.title || `${other.teamSize} vs ${other.teamSize}`) === base);
+  if (!twin) return base;
   if (/share_until_death/i.test(queue.name)) return `${base}, no share`;
   if (/full_share/i.test(queue.name)) return `${base}, full share`;
   return base;
@@ -88,7 +103,5 @@ export function queueTitle(queue: Pick<PcQueue, "name" | "teamSize">): string {
 /** A queue by its technical name, for status lines. */
 export function queueName(name: string, queues: PcQueue[]): string {
   const known = queues.find((q) => q.name === name);
-  if (known) return queueTitle(known);
-  const size = /(\d)v\1/.exec(name);
-  return size ? `${size[1]} vs ${size[1]}` : name;
+  return known ? queueTitle(known, queues) : name;
 }

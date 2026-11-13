@@ -63,22 +63,23 @@ The client is "FAF Web" in gitops-stack `apps/ory-hydra/values.yaml`. Its only r
 
 ## Your PC (the PC link)
 
-A logged-in player can steer the FAF Rust client on their own PC from the Play tab: start or stop a matchmaker search, join an open lobby, see their friends, and get "Match found" on their phone. Nothing is played in the browser; the game runs on the PC. Only the Rust client takes part, and only once the player turns on Settings > Account > "Allow control from the web client" there (off by default).
+A logged-in player can steer the FAF Rust client on their own PC from the Play tab: start or stop a matchmaker search, join an open lobby, see their friends, and get "Match found" on their phone, or "Your PC needs you" when a join they asked for stops at a decision on the PC or fails. Nothing is played in the browser; the game runs on the PC. Only the Rust client takes part, and only once the player turns on Settings > Account > "Allow control from the web client" there (off by default).
 
 ```
 phone browser ──wss──►  webclient /api/link  ◄──wss──  Rust client on the PC
-              ◄─push─  (Web Push, from the server, when the PC reports a match)
+              ◄─push─  (Web Push, from the server, when the PC reports a match or needs its player)
 ```
 
 - Both ends connect out to this site, so nothing on the PC is opened to the internet. The server pairs a browser and a PC only when they belong to the same FAF account (`lib/link.js`).
-- The PC proves its account with its own FAF access token. Hydra signs those as JWTs; the server checks the signature against Hydra's published keys (`/.well-known/jwks.json`, `lib/jwt.js`), the issuer, the expiry, and that the token was issued to the Rust client's OAuth client (`03c2132b-...`, or the Python client's `95ecec08-...`, which the Rust client signed in with before it had its own and still renews remembered logins under). A page in a browser cannot pose as the PC: browsers always send an `Origin`, and the PC side refuses one.
+- The PC proves its account with its OIDC ID token, never its access token. The server checks the signature against Hydra's published keys (`/.well-known/jwks.json`, `lib/jwt.js`), the issuer, the expiry, and that the token was issued to (`aud`) the Rust client's OAuth client (`03c2132b-...`, or the Python client's `95ecec08-...`, which the Rust client signed in with before it had its own and still renews remembered logins under). An access token is refused even when FAF signed it. An ID token names the player and nothing more: neither FAF's API nor the lobby accepts one, so this server never holds anything that could act as the player, and it neither stores nor logs the token. Nothing about the computer itself is sent, only the client's name and version. A page in a browser cannot pose as the PC: browsers always send an `Origin`, and the PC side refuses one.
 - The browser proves its account with a ticket the server signs at login and with each chat token renewal (`linkTicket`, 25 hours). Its WebSocket must come from this site's own origin.
-- The browser can ask for four things and nothing else: start a search in named queues, stop searching, join a game by id (with its password), and send the state again. The server checks each, rate-limits them (30 a minute), and the Rust client checks them again before acting.
+- The browser can ask for four things and nothing else: start a search in named queues, stop searching, join a game by id (with its password), and send the state again. The server checks each, rate-limits them (30 a minute), and the Rust client checks them again before acting. An accepted join means the PC was asked, so the page says "Asked your PC to join"; if the join then stops at the mod replacement prompt on the PC or is refused, the PC reports it and the page and the phone say "Your PC needs you" and why.
+- The same rules are written in Rust in the client (`web_link.rs`), which generates them into `docs/web-link-protocol.json` there. `test/web-link-protocol.json` is that file, pinned to the commit in `test/web-link-protocol.commit`, and `npm test` checks the server against it ("link protocol"): every request accepted or refused alike and in the same shape, every message the PC sends read, every message it reads sent. When the Rust client changes the link, take its new file with `node scripts/link-protocol.js <commit>` and fix `lib/link.js` until the suite passes.
 - One PC per account (a second one takes over and the first is told why), at most 8 browsers per account. Nothing is stored: the PC's latest state is kept in memory for browsers that connect later.
-- "Match found" reaches a phone with the page closed through Web Push (RFC 8291 encryption, RFC 8292 VAPID, `lib/webpush.js`), and only to the browsers' own push services (Google, Mozilla, Apple, Microsoft). The key pair is made when the server starts; browsers sign up again whenever they connect, so no key needs configuring. An iPhone needs the site added to its Home Screen for notifications (iOS 16.4 and later). TMM games start about a minute after the match is found, so be quick.
+- "Match found" and "Your PC needs you" reach a phone with the page closed through Web Push (RFC 8291 encryption, RFC 8292 VAPID, `lib/webpush.js`), and only to the browsers' own push services (Google, Mozilla, Apple, Microsoft). The key pair is made when the server starts; browsers sign up again whenever they connect, so no key needs configuring. An iPhone needs the site added to its Home Screen for notifications (iOS 16.4 and later). TMM games start about a minute after the match is found, so be quick.
 - The link assumes one server process (the deployment runs one replica).
 
-Settings, all optional: `FAF_LINK=off` turns it off. `FAF_LINK_PUSH=off` turns off notifications only. `FAF_LINK_VAPID_KEY` (a PKCS#8 PEM EC P-256 key) keeps one push key across restarts. `FAF_LINK_SECRET` keeps tickets valid across restarts. `FAF_LINK_CLIENT_IDS` (comma-separated) replaces the OAuth client ids whose tokens may act as the PC. `GET /healthz` shows `"link"`: how many PCs and browsers are connected.
+Settings, all optional: `FAF_LINK=off` turns it off. `FAF_LINK_PUSH=off` turns off notifications only. `FAF_LINK_VAPID_KEY` (a PKCS#8 PEM EC P-256 key) keeps one push key across restarts. `FAF_LINK_SECRET` keeps tickets valid across restarts. `FAF_LINK_CLIENT_IDS` (comma-separated) replaces the OAuth client ids whose ID tokens may act as the PC. `GET /healthz` shows `"link"`: how many PCs and browsers are connected.
 
 ## Layout
 
@@ -86,6 +87,7 @@ Settings, all optional: `FAF_LINK=off` turns it off. `FAF_LINK_PUSH=off` turns o
 |---|---|
 | `server.js`, `lib/` | Server: static files, the proxy, auto-update. No runtime dependencies. |
 | `webtest.js` | Server tests (`npm test`). No network needed. |
+| `test/web-link-protocol.json` | The Rust client's PC link contract, pinned to a commit of its repository (`test/web-link-protocol.commit`). Taken with `scripts/link-protocol.js`. |
 | `web/` | Website source: React + TypeScript + Vite. |
 | `web/src/ds/` | The Rust client's design system: tokens, fonts, shell and nav styles, icons. |
 | `public/` | The **built** website, committed so a git clone runs without a build step. The image builds its own copy from `web/`. |
@@ -103,7 +105,11 @@ Commit `web/` and `public/` together. For live editing, run `node server.js` in 
 
 ## Releasing
 
-Pushing to `main` is the release, the same setup as FAForever/faf-tournaments:
+`main` is protected: a change lands through a pull request with an approving review from someone other than its author, and the checks below must pass. Every image is therefore built from a reviewed commit. That matters more here than for a read-only site, because the PC link can start searches and joins on players' PCs (behind the Rust client's own checks, and only for players who turned it on there).
+
+Maintainers: Nuggets. The FAF Rust client lists this deployment in its `docs/web-link.md`.
+
+Merging to `main` is the release, the same setup as FAForever/faf-tournaments:
 
 1. GitHub Actions (`.github/workflows/image.yml`) checks the server, runs `npm test`, builds the website, then builds the image and publishes it as `faforever/faf-webclient:latest` and `:<commit>`.
 2. FAF's cluster (gitops-stack `apps/faf-webclient`) notices the new `latest` within two minutes and rolls it out (Keel).

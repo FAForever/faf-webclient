@@ -139,9 +139,9 @@ export async function renewPush(pushKey: string | null): Promise<void> {
 }
 
 /** A notification from the page itself, for a page that is open but not looked at. */
-export async function notifyHere(title: string, body: string): Promise<void> {
+export async function notifyHere(title: string, body: string, tag: string): Promise<void> {
   if (!("Notification" in window) || Notification.permission !== "granted" || !("serviceWorker" in navigator)) return;
   const reg = await navigator.serviceWorker.getRegistration("/");
-  // Same tag as the push from the server, so the two end up as one.
-  await reg?.showNotification(title, { body, tag: "faf-match-found", icon: "/assets/icon-192.png", data: { url: "/play" } }).catch(() => undefined);
+  // The push from the server uses the same tags (lib/link.js), so the two end up as one.
+  await reg?.showNotification(title, { body, tag, icon: "/assets/icon-192.png", data: { url: "/play" } }).catch(() => undefined);
 }

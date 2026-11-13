@@ -114,7 +114,16 @@ function LobbyCard({ game, onJoin }: { game: Lobby; onJoin?: (game: Lobby) => vo
   );
 }
 
-/** Asks for the password, then has the PC join. */
+/**
+ * The PC took the request, which is all that is known yet: the join can still
+ * stop at the mod replacement prompt on the PC, or be refused by the server.
+ * Either comes back as "Your PC needs you" (MatchBanner) and in the panel.
+ */
+function askedToJoin(title: string): string {
+  return `Asked your PC to join "${title}".`;
+}
+
+/** Asks for the password, then asks the PC to join. */
 function JoinDialog({ game, onClose }: { game: Lobby; onClose: (message?: string) => void }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -126,7 +135,7 @@ function JoinDialog({ game, onClose }: { game: Lobby; onClose: (message?: string
     setProblem("");
     const result = await sendCommand({ action: "joinGame", gameId: game.id, password: password || undefined });
     setBusy(false);
-    if (result.ok) onClose(`Joining "${game.title}" on your PC.`);
+    if (result.ok) onClose(askedToJoin(game.title));
     else setProblem(result.error ?? "Your PC refused.");
   };
 
@@ -192,7 +201,7 @@ export function PlayView() {
       return;
     }
     const result = await sendCommand({ action: "joinGame", gameId: game.id });
-    setNotice(result.ok ? { text: `Joining "${game.title}" on your PC.`, ok: true } : { text: result.error ?? "Your PC refused.", ok: false });
+    setNotice(result.ok ? { text: askedToJoin(game.title), ok: true } : { text: result.error ?? "Your PC refused.", ok: false });
   };
 
   return (

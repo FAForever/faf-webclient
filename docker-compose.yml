@@ -58,4 +58,4 @@ services:
       # created the client.
       FAF_LOGIN_CLIENT_ID: "${FAF_LOGIN_CLIENT_ID:-}"
 
-    command: ["sh", "-c", "set -e; rm -rf /app; mkdir -p /app; git clone --depth 1 --branch main https://github.com/FAForever/webclient.git /app; cd /app; exec node server.js"]
+    command: ["sh", "-c", "set -e; rm -rf /app; mkdir -p /app; git clone --depth 1 --branch main https://github.com/FAForever/faf-webclient.git /app; cd /app; exec node server.js"]

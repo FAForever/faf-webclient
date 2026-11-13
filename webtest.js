@@ -33,8 +33,8 @@ const { createWatcher, redactUrl } = require('./lib/watcher');
 const { createTokenSource } = require('./lib/faftoken');
 const { boardTarget, pageOf, apiTarget, pageFromApi, PAGE_SIZE } = require('./lib/leaderboard');
 const { createUserLogin, jwtClaims, validRedirect } = require('./lib/userlogin');
-const { createLink, commandFrom, RUST_CLIENT_ID, LEGACY_RUST_CLIENT_ID } = require('./lib/link');
-const { createJwtVerifier } = require('./lib/jwt');
+const { createLink, commandFrom, eventFrom, RUST_CLIENT_ID, LEGACY_RUST_CLIENT_ID, PROTOCOL_VERSION, LIMITS } = require('./lib/link');
+const { createJwtVerifier, checkIdToken } = require('./lib/jwt');
 const { createWebPush, encrypt, allowedEndpoint } = require('./lib/webpush');
 const crypto = require('crypto');
 
@@ -775,9 +775,14 @@ function wsClient(port, headers) {
       inbox,
       send2: (value) => ws.send(JSON.stringify(value)),
       // The next message of this type (or the close), within 2 s.
-      next: (type) => new Promise((done) => {
+      next: (type) => new Promise((resolveNext) => {
         const started = Date.now();
+        // A look still scheduled after this resolved must not take the
+        // next message of the same type away from a later call.
+        let finished = false;
+        const done = (value) => { finished = true; resolveNext(value); };
         const look = () => {
+          if (finished) return;
           const i = inbox.findIndex((m) => m.type === type);
           if (i >= 0) return done(inbox.splice(i, 1)[0]);
           if (ws.readyState === 3 || Date.now() - started > 2000) return done(null);
@@ -804,17 +809,10 @@ async function testLink() {
   eq(commandFrom({ action: 'joinGame', gameId: 42, password: 'x'.repeat(101) }), null, 'link: passwords are bounded');
   eq(commandFrom({ action: 'host', title: 'x' }), null, 'link: anything else is refused');
   eq(commandFrom({ action: 'stopSearch' }).action, 'stopSearch', 'link: stopping every search needs no queue');
+  eq(JSON.stringify(commandFrom({ action: 'stopSearch', queues: null })), '{"action":"stopSearch"}', 'link: no queue list is every queue');
+  ok(commandFrom({ action: 'joinGame', gameId: 42, password: '\u{1F600}'.repeat(100) }) !== null, 'link: a password is counted in characters, not UTF-16 units');
 
-  // Tokens: a fake verifier standing in for lib/jwt.js.
-  const tokens = {
-    verify: async (token) => {
-      const [kind, sub, name] = String(token).split(':');
-      if (kind === 'rust') return { sub, client_id: RUST_CLIENT_ID, ext: { username: name } };
-      if (kind === 'legacy') return { sub, client_id: LEGACY_RUST_CLIENT_ID };
-      if (kind === 'other') return { sub, client_id: 'some-other-site' };
-      throw Object.assign(new Error('token not signed by FAF'), { code: 'bad-signature' });
-    }
-  };
+  const { tokens } = fakeTokens();
   const pushed = [];
   const fakePush = { publicKey: 'pk', send: async (sub, message) => { pushed.push({ sub, message }); return { status: 201 }; } };
   let clock = Date.now();
@@ -847,6 +845,10 @@ async function testLink() {
     const otherApp = await wsClient(port);
     otherApp.send2({ type: 'hello', role: 'pc', version: 1, token: 'other:42' });
     eq((await otherApp.next('error') || {}).code, 'client', 'link: only the Rust client\'s tokens act as the PC');
+    const accessToken = await wsClient(port);
+    accessToken.send2({ type: 'hello', role: 'pc', version: 1, token: 'access:42:Ada' });
+    const tooMuch = await accessToken.next('error');
+    ok(tooMuch && tooMuch.code === 'token' && /ID token/.test(tooMuch.message), 'link: an access token is refused, even the Rust client\'s', JSON.stringify(tooMuch));
     const pageAsPc = await wsClient(port, web);
     pageAsPc.send2({ type: 'hello', role: 'pc', version: 1, token: 'rust:42:Ada' });
     eq((await pageAsPc.next('error') || {}).code, 'origin', 'link: a web page cannot pose as the PC');
@@ -861,7 +863,7 @@ async function testLink() {
 
     // The real pairing.
     const pc = await wsClient(port);
-    pc.send2({ type: 'hello', role: 'pc', version: 1, token: 'rust:42:Ada', client: 'FAF Rust client 1.0', device: 'DESKTOP' });
+    pc.send2({ type: 'hello', role: 'pc', version: 1, token: 'rust:42:Ada', client: 'FAF Rust client 1.0' });
     const welcome = await pc.next('welcome');
     eq(welcome && welcome.browsers, 0, 'link: the PC is welcomed, no browser yet');
     pc.send2({ type: 'state', state: { matchmaking: { status: 'idle' } } });
@@ -870,7 +872,8 @@ async function testLink() {
     const browser = await wsClient(port, web);
     browser.send2({ type: 'hello', role: 'web', version: 1, ticket });
     const bw = await browser.next('welcome');
-    ok(bw && bw.pc && bw.pc.connected === true && bw.pc.device === 'DESKTOP', 'link: the browser hears its PC is there', JSON.stringify(bw));
+    ok(bw && bw.pc && bw.pc.connected === true && bw.pc.client === 'FAF Rust client 1.0' && bw.pc.name === 'Ada', 'link: the browser hears its PC is there', JSON.stringify(bw));
+    ok(bw && bw.pc && !('device' in bw.pc), 'link: nothing about the computer itself is passed on', JSON.stringify(bw));
     const lateState = await browser.next('state');
     eq(lateState && lateState.state.matchmaking.status, 'idle', 'link: a browser that comes later gets the latest state');
     eq((await pc.next('browsers') || {}).count, 1, 'link: the PC hears a browser is connected');
@@ -901,20 +904,31 @@ async function testLink() {
     eq(link.setPush({ ticket, subscription: { endpoint: 'https://evil.test/x', keys: { p256dh: 'a', auth: 'b' } } }).status, 400, 'link: push only to the browsers\' push services');
     eq(link.setPush({ ticket: 'nope', subscription: {} }).status, 401, 'link: push needs a ticket');
     eq(link.setPush({ ticket, subscription: { endpoint: 'https://fcm.googleapis.com/fcm/send/abc', keys: { p256dh: 'pkey', auth: 'akey' } } }).status, 200, 'link: a phone signs up for notifications');
-    pc.send2({ type: 'event', event: 'matchFound', queue: 'ladder1v1' });
+    pc.send2({ type: 'event', event: 'matchFound', queue: 'ladder1v1', title: '1 vs 1' });
     const found = await browser.next('event');
     eq(found && found.event, 'matchFound', 'link: the browser hears the match was found');
     await settle();
     eq(pushed.length, 1, 'link: the phone is notified once');
-    ok(pushed[0] && /1v1/.test(pushed[0].message.body), 'link: the notification names the queue', pushed[0] && pushed[0].message.body);
+    ok(pushed[0] && pushed[0].message.body === 'Your 1 vs 1 game is starting on your PC.', 'link: the notification names the queue as the PC titled it', pushed[0] && pushed[0].message.body);
+
+    // A join the browser asked for stopped at the PC: the phone hears why.
+    pc.send2({ type: 'event', event: 'attention', reason: 'The game could not be joined: Bad password' });
+    const needed = await browser.next('event');
+    eq(needed && needed.reason, 'The game could not be joined: Bad password', 'link: the browser hears the PC needs its player');
+    await settle();
+    ok(pushed[1] && pushed[1].message.title === 'Your PC needs you' && /Bad password/.test(pushed[1].message.body), 'link: and so does the phone', pushed[1] && JSON.stringify(pushed[1].message));
+    pc.send2({ type: 'event', event: 'somethingElse' });
+    await settle();
+    eq(pushed.length, 2, 'link: an event this server does not know reaches no phone');
+    eq(browser.inbox.filter((m) => m.type === 'event').length, 0, 'link: nor any browser');
 
     // One PC per account: a second one takes over.
     const pc2 = await wsClient(port);
-    pc2.send2({ type: 'hello', role: 'pc', version: 1, token: 'rust:42:Ada', device: 'LAPTOP' });
+    pc2.send2({ type: 'hello', role: 'pc', version: 1, token: 'rust:42:Ada', client: 'FAF Rust client 1.1' });
     await pc2.next('welcome');
     ok(await pc.next('replaced'), 'link: the older PC is told it was replaced');
     const moved = await browser.next('pc');
-    eq(moved && moved.pc.device, 'LAPTOP', 'link: the browser follows the new PC');
+    eq(moved && moved.pc.client, 'FAF Rust client 1.1', 'link: the browser follows the new PC');
 
     // A Rust client still renewing a login from before it had its own OAuth client.
     const older = await wsClient(port);
@@ -926,8 +940,147 @@ async function testLink() {
     const gone = await browser.next('pc');
     eq(gone && gone.pc.connected, false, 'link: the browser hears the PC left');
     eq(link.stats().pcs, 0, 'link: no PC is left connected');
-    for (const c of [browser, stranger, pc]) c.close();
+    for (const c of [browser, stranger, pc, accessToken]) c.close();
   } finally {
+    await new Promise((r) => server.close(r));
+  }
+}
+
+/**
+ * Stand-ins for lib/jwt.js's verifier: "kind:sub:name" names the claims a
+ * token would carry, and the real ID-token check runs on them.
+ */
+function fakeTokens() {
+  const claimsFor = {
+    rust: (sub, name) => ({ sub, aud: [RUST_CLIENT_ID], preferred_username: name }),
+    legacy: (sub) => ({ sub, aud: LEGACY_RUST_CLIENT_ID }),
+    other: (sub) => ({ sub, aud: ['some-other-site'] }),
+    // What the Rust client sent before it sent its ID token.
+    access: (sub, name) => ({ sub, aud: [], client_id: RUST_CLIENT_ID, scp: ['openid', 'lobby'], ext: { username: name } })
+  };
+  return {
+    tokens: {
+      verifyIdToken: async (token, clientIds) => {
+        const [kind, sub, name] = String(token).split(':');
+        if (!claimsFor[kind]) throw Object.assign(new Error('token not signed by FAF'), { code: 'bad-signature' });
+        return checkIdToken(claimsFor[kind](sub, name), clientIds);
+      }
+    }
+  };
+}
+
+/** JSON with sorted keys and without undefined fields, to compare by content. */
+function canonical(value) {
+  if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value).filter((k) => value[k] !== undefined).sort()
+      .map((k) => JSON.stringify(k) + ':' + canonical(value[k])).join(',') + '}';
+  }
+  return JSON.stringify(value === undefined ? null : value);
+}
+const sameJson = (a, b) => canonical(a) === canonical(b);
+const keysOf = (value) => (value && typeof value === 'object' ? Object.keys(value).filter((k) => value[k] !== undefined).sort().join(',') : String(value));
+
+/**
+ * The Rust client's side of the link, as it generates it
+ * (test/web-link-protocol.json, pinned by test/web-link-protocol.commit; see
+ * scripts/link-protocol.js). This server must read every message the PC
+ * sends, send the PC only what it reads, and accept exactly the requests it
+ * accepts, in the same shape.
+ */
+async function testLinkProtocol() {
+  const contract = JSON.parse(fs.readFileSync(path.join(__dirname, 'test', 'web-link-protocol.json'), 'utf8'));
+  const { limits, outbound: out, inbound } = contract;
+  eq(contract.version, PROTOCOL_VERSION, 'contract: the same protocol version');
+  eq(LIMITS.MAX_QUEUES, limits.maxQueues, 'contract: as many queues per search');
+  eq(LIMITS.MAX_PASSWORD_CHARS, limits.maxPasswordChars, 'contract: passwords as long');
+  eq(LIMITS.MAX_PROBLEM_CHARS, limits.maxProblemChars, 'contract: reasons as long');
+  eq(LIMITS.MAX_GAME_ID, limits.maxGameId, 'contract: game ids as large');
+  eq(limits.minGameId, 1, 'contract: game ids from 1');
+  ok(commandFrom({ action: 'startSearch', queues: ['q'.repeat(limits.maxQueueNameBytes)] })
+    && !commandFrom({ action: 'startSearch', queues: ['q'.repeat(limits.maxQueueNameBytes + 1)] }), 'contract: queue names as long');
+
+  // Every request: accepted in the same shape, or refused, on both sides.
+  ok(contract.commands.length >= 30, 'contract: the request cases are there', String(contract.commands.length));
+  for (const c of contract.commands) {
+    const got = commandFrom(c.request);
+    ok(sameJson(got, c.accepted), 'contract: ' + c.name, 'expected ' + canonical(c.accepted) + ', got ' + canonical(got));
+  }
+
+  // Every message the PC sends is one this server handles.
+  for (const [name, msg] of Object.entries(out)) {
+    ok(['hello', 'state', 'games', 'event', 'result'].includes(msg.type), 'contract: the server reads the PC\'s ' + name, msg.type);
+  }
+  eq(keysOf(out.hello), 'client,role,token,type,version', 'contract: the hello carries what the server reads and nothing else');
+  for (const name of ['matchFound', 'matchFoundUnknownQueue', 'attention', 'attentionFailed']) {
+    const event = eventFrom(out[name]);
+    ok(sameJson(event, out[name]), 'contract: ' + name + ' reaches browsers as the PC sent it', canonical(event));
+  }
+
+  // And through a running link.
+  const { tokens } = fakeTokens();
+  const pushed = [];
+  const fakePush = { publicKey: 'pk', send: async (sub, message) => { pushed.push(message); return { status: 201 }; } };
+  const link = createLink({ tokens, push: fakePush, secret: 'contract', allowedOrigin: () => true });
+  const server = http.createServer();
+  server.on('upgrade', (req, socket, head) => link.handleUpgrade(req, socket, head));
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const port = server.address().port;
+  const ticket = link.issueTicket({ id: '42', name: 'Nuggets' });
+  const sockets = [];
+  try {
+    const refused = await wsClient(port);
+    sockets.push(refused);
+    refused.send2(Object.assign({}, out.hello, { token: 'nonsense' }));
+    eq(keysOf(await refused.next('error')), keysOf(inbound.error), 'contract: a refusal is the error the PC reads');
+
+    const pc = await wsClient(port);
+    sockets.push(pc);
+    pc.send2(Object.assign({}, out.hello, { token: 'rust:42:Nuggets' }));
+    eq(keysOf(await pc.next('welcome')), keysOf(inbound.welcome), 'contract: the welcome is the one the PC reads');
+
+    const browser = await wsClient(port, { origin: 'http://site.test' });
+    sockets.push(browser);
+    browser.send2({ type: 'hello', role: 'web', version: 1, ticket });
+    await browser.next('welcome');
+    eq(keysOf(await pc.next('browsers')), keysOf(inbound.browsers), 'contract: a browser arriving is the message the PC reads');
+
+    pc.send2(out.state);
+    const state = await browser.next('state');
+    ok(sameJson(state, out.state), 'contract: the state reaches the browser whole');
+    pc.send2(out.games);
+    const games = await browser.next('games');
+    ok(sameJson(games, out.games), 'contract: the lobby list reaches the browser whole');
+
+    link.setPush({ ticket, subscription: { endpoint: 'https://fcm.googleapis.com/fcm/send/contract', keys: { p256dh: 'p', auth: 'a' } } });
+    pc.send2(out.matchFound);
+    ok(sameJson(await browser.next('event'), out.matchFound), 'contract: a match found reaches the browser');
+    pc.send2(out.matchFoundUnknownQueue);
+    await browser.next('event');
+    pc.send2(out.attention);
+    ok(sameJson(await browser.next('event'), out.attention), 'contract: "your PC needs you" reaches the browser');
+    await settle();
+    eq(pushed.length, 3, 'contract: each reaches the phone');
+    eq(pushed[0] && pushed[0].body, `Your ${out.matchFound.title} game is starting on your PC.`, 'contract: the phone names the queue as the PC titled it');
+    eq(pushed[1] && pushed[1].body, 'Your game is starting on your PC.', 'contract: a queue without a title still makes sense');
+    eq(pushed[2] && pushed[2].body, out.attention.reason, 'contract: the phone says why the PC needs you, in the PC\'s words');
+
+    const asked = inbound.command;
+    browser.send2({ type: 'command', id: asked.id, command: asked.command });
+    const passed = await pc.next('command');
+    eq(keysOf(passed), keysOf(asked), 'contract: a request is the command the PC reads');
+    ok(sameJson(passed && passed.command, asked.command), 'contract: and carries the request as the PC expects it');
+    for (const result of [out.resultOk, out.resultRefused]) {
+      pc.send2(result);
+      ok(sameJson(await browser.next('result'), result), 'contract: the PC\'s answer reaches the browser: ' + result.id);
+    }
+
+    const second = await wsClient(port);
+    sockets.push(second);
+    second.send2(Object.assign({}, out.hello, { token: 'rust:42:Nuggets' }));
+    eq(keysOf(await pc.next('replaced')), keysOf(inbound.replaced), 'contract: being replaced is the message the PC reads');
+  } finally {
+    for (const ws of sockets) ws.close();
     await new Promise((r) => server.close(r));
   }
 }
@@ -960,6 +1113,17 @@ async function testJwt() {
   const unsigned = Buffer.from('{"alg":"none"}').toString('base64url') + '.' + Buffer.from(JSON.stringify(good)).toString('base64url') + '.';
   eq(await reason(unsigned), 'malformed', 'jwt: an unsigned token is refused');
   ok(fetches <= 2, 'jwt: the keys are not fetched for every token', String(fetches));
+
+  // The PC link takes an ID token issued to the Rust client, and nothing else.
+  const idToken = { iss: 'https://hydra.example', sub: '42', aud: [RUST_CLIENT_ID], exp: Math.floor(now / 1000) + 600, preferred_username: 'Ada' };
+  const idReason = async (claimsIn) => verifier.verifyIdToken(sign(claimsIn), [RUST_CLIENT_ID]).then((c) => 'accepted:' + c.sub, (err) => err.code);
+  eq(await idReason(idToken), 'accepted:42', 'jwt: an ID token issued to the Rust client is read');
+  eq(await idReason(Object.assign({}, idToken, { aud: RUST_CLIENT_ID })), 'accepted:42', 'jwt: an audience may be a single string');
+  eq(await idReason(Object.assign({}, idToken, { aud: ['another-site'] })), 'wrong-client', 'jwt: an ID token for another program is refused');
+  eq(await idReason(Object.assign({}, idToken, { aud: undefined })), 'wrong-client', 'jwt: an ID token for no one is refused');
+  eq(await idReason(good), 'access-token', 'jwt: an access token is refused even when FAF signed it');
+  eq(await idReason(Object.assign({}, idToken, { scp: ['lobby'] })), 'access-token', 'jwt: anything carrying scopes is an access token');
+  eq(await idReason(Object.assign({}, idToken, { exp: Math.floor(now / 1000) - 3600 })), 'expired', 'jwt: an expired ID token is refused');
 }
 
 /** RFC 8291 from the receiving side, to check `encrypt` round trips. */
@@ -1058,6 +1222,7 @@ async function testWebSocket() {
     ['leaderboard', testLeaderboard],
     ['server', testServer],
     ['pc link', testLink],
+    ['link protocol', testLinkProtocol],
     ['token check', testJwt],
     ['web push', testWebPush],
     ['websocket', testWebSocket],

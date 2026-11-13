@@ -29,9 +29,15 @@ export interface CommandResult {
   error?: string;
 }
 
+/**
+ * What the PC reports: "matchFound" (with the queue and its title), or
+ * "attention" (with a sentence saying why the PC needs its player).
+ */
 export interface LinkEvent {
   event: string;
   queue?: string;
+  title?: string;
+  reason?: string;
 }
 
 const NO_PC: PcInfo = { connected: false };
@@ -222,7 +228,8 @@ async function open(path: string) {
         return;
       case "event":
         if (typeof msg.event === "string") {
-          const event: LinkEvent = { event: msg.event, queue: typeof msg.queue === "string" ? msg.queue : undefined };
+          const text = (value: unknown) => (typeof value === "string" && value ? value : undefined);
+          const event: LinkEvent = { event: msg.event, queue: text(msg.queue), title: text(msg.title), reason: text(msg.reason) };
           eventListeners.forEach((listener) => listener(event));
         }
         return;
